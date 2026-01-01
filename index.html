@@ -585,18 +585,26 @@
             <div
                 class="sticky top-0 z-10 bg-white/90 backdrop-blur-md border-b border-slate-100 px-4 py-3 md:px-6 md:py-4 flex justify-between items-center">
                 <div class="w-full mr-4">
-                    <input type="text" id="modal-patient-name" class="w-full text-xl font-bold text-slate-800 bg-transparent border-none focus:ring-0 p-0 placeholder-slate-300" placeholder="Patient Name">
+                    <input type="text" id="modal-patient-name"
+                        class="w-full text-xl font-bold text-slate-800 bg-transparent border-none focus:ring-0 p-0 placeholder-slate-300"
+                        placeholder="Patient Name">
                     <div class="flex items-center gap-2 text-sm text-slate-500 mt-1">
-                        <input type="text" id="modal-patient-code" class="w-24 bg-transparent border-b border-transparent focus:border-medical-500 focus:outline-none text-slate-500" placeholder="ID">
+                        <input type="text" id="modal-patient-code"
+                            class="w-24 bg-transparent border-b border-transparent focus:border-medical-500 focus:outline-none text-slate-500"
+                            placeholder="ID">
                         &bull;
                         <div class="flex items-center">
-                            <input type="number" id="modal-patient-age" class="w-12 bg-transparent border-b border-transparent focus:border-medical-500 focus:outline-none text-slate-500 text-right" placeholder="0">
+                            <input type="number" id="modal-patient-age"
+                                class="w-12 bg-transparent border-b border-transparent focus:border-medical-500 focus:outline-none text-slate-500 text-right"
+                                placeholder="0">
                             <span class="ml-1">Yrs</span>
                         </div>
                         &bull;
                         <div class="flex items-center">
                             <span class="mr-1">Rm</span>
-                            <input type="text" id="modal-patient-room" class="w-16 bg-transparent border-b border-transparent focus:border-medical-500 focus:outline-none text-slate-500" placeholder="Room">
+                            <input type="text" id="modal-patient-room"
+                                class="w-16 bg-transparent border-b border-transparent focus:border-medical-500 focus:outline-none text-slate-500"
+                                placeholder="Room">
                         </div>
                     </div>
                 </div>
@@ -655,7 +663,13 @@
 
                 <!-- Medication List -->
                 <section>
-                    <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wide mb-3">Medication List</h3>
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wide">Medication List</h3>
+                        <button onclick="openDischargePlanModal()"
+                            class="text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-3 py-1.5 rounded-lg font-medium transition-colors border border-indigo-200">
+                            <i class="fa-solid fa-file-prescription mr-1.5"></i> Generate Discharge Plan
+                        </button>
+                    </div>
                     <div class="space-y-3">
                         <div>
                             <label class="text-xs font-bold text-slate-500 uppercase mb-1 block">Regular
@@ -1082,6 +1096,104 @@
                     <p class="text-xs text-slate-400 text-center mt-2">Archives today's data and resets daily fields.
                     </p>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Discharge Plan Modal -->
+    <div id="discharge-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in">
+        <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="closeDischargePlanModal()"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-4 my-6 flex flex-col max-h-[90vh]">
+
+            <div
+                class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
+                <div>
+                    <h3 class="font-bold text-xl text-slate-800">Discharge Plan Generator</h3>
+                    <p class="text-xs text-slate-500">Review and edit medication categories</p>
+                </div>
+                <button onclick="closeDischargePlanModal()" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/30">
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Analgesics -->
+                    <div class="bg-white p-4 rounded-xl border border-rose-100 shadow-sm">
+                        <label
+                            class="text-xs font-bold text-rose-500 uppercase mb-2 block flex items-center justify-between">
+                            Analgesics (Pain)
+                            <i class="fa-solid fa-capsules"></i>
+                        </label>
+                        <textarea id="dp-analgesics" rows="3"
+                            class="w-full text-sm p-3 bg-rose-50/30 border border-rose-100 rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none resize-none"></textarea>
+                    </div>
+
+                    <!-- Antiemetics -->
+                    <div class="bg-white p-4 rounded-xl border border-orange-100 shadow-sm">
+                        <label
+                            class="text-xs font-bold text-orange-500 uppercase mb-2 block flex items-center justify-between">
+                            Antiemetics (Nausea)
+                            <i class="fa-solid fa-mask-face"></i>
+                        </label>
+                        <textarea id="dp-antiemetics" rows="3"
+                            class="w-full text-sm p-3 bg-orange-50/30 border border-orange-100 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none resize-none"></textarea>
+                    </div>
+
+                    <!-- Anxiolytics -->
+                    <div class="bg-white p-4 rounded-xl border border-purple-100 shadow-sm">
+                        <label
+                            class="text-xs font-bold text-purple-500 uppercase mb-2 block flex items-center justify-between">
+                            Anxiolytics (Anxiety)
+                            <i class="fa-solid fa-brain"></i>
+                        </label>
+                        <textarea id="dp-anxiolytics" rows="3"
+                            class="w-full text-sm p-3 bg-purple-50/30 border border-purple-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:outline-none resize-none"></textarea>
+                    </div>
+
+                    <!-- Sleep Aids -->
+                    <div class="bg-white p-4 rounded-xl border border-indigo-100 shadow-sm">
+                        <label
+                            class="text-xs font-bold text-indigo-500 uppercase mb-2 block flex items-center justify-between">
+                            Sleep Aids / Sedatives
+                            <i class="fa-solid fa-moon"></i>
+                        </label>
+                        <textarea id="dp-sleep" rows="3"
+                            class="w-full text-sm p-3 bg-indigo-50/30 border border-indigo-100 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"></textarea>
+                    </div>
+                </div>
+
+                <!-- Anticoagulants (Full Width) -->
+                <div class="bg-white p-4 rounded-xl border border-red-100 shadow-sm">
+                    <label
+                        class="text-xs font-bold text-red-600 uppercase mb-2 block flex items-center justify-between">
+                        Anticoagulants (Blood Thinners)
+                        <i class="fa-solid fa-droplet"></i>
+                    </label>
+                    <textarea id="dp-anticoagulants" rows="2"
+                        class="w-full text-sm p-3 bg-red-50/30 border border-red-100 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none resize-none"></textarea>
+                </div>
+
+                <!-- Others -->
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <label class="text-xs font-bold text-slate-500 uppercase mb-2 block">Other Recommended
+                        Medications</label>
+                    <textarea id="dp-others" rows="4"
+                        class="w-full text-sm p-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-400 focus:outline-none resize-none"></textarea>
+                </div>
+
+            </div>
+
+            <div class="px-6 py-4 border-t border-slate-100 bg-white rounded-b-2xl flex justify-between items-center">
+                <span id="dp-copy-status" class="text-sm font-medium text-green-600 opacity-0 transition-opacity">
+                    <i class="fa-solid fa-check mr-1"></i> Copied to clipboard!
+                </span>
+                <button onclick="copyDischargePlan()"
+                    class="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:shadow-indigo-300 transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-copy"></i>
+                    Copy Discharge Plan
+                </button>
             </div>
         </div>
     </div>

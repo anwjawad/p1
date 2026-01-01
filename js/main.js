@@ -1983,3 +1983,155 @@ function printMedications() {
         alert("Pop-up blocked! Please allow pop-ups to print.");
     }
 }
+
+// --------------------------------------------------------
+// DISCHARGE PLAN LOGIC
+// --------------------------------------------------------
+
+function openDischargePlanModal() {
+    if (!appData.currentPatient) return;
+
+    // 1. Get Medications
+    let regularMeds = '';
+    let prnMeds = '';
+
+    // Robust extraction similar to openModal
+    let medsData = { regular: '', prn: '' };
+    if (appData.currentPatient.medications) {
+        if (typeof appData.currentPatient.medications === 'object') {
+            medsData = appData.currentPatient.medications;
+        } else {
+            try {
+                // If it's a string, try parse it, or fallback to simple string
+                if (appData.currentPatient.medications.trim().startsWith('{')) {
+                    medsData = JSON.parse(appData.currentPatient.medications);
+                } else {
+                    medsData.regular = appData.currentPatient.medications || '';
+                }
+            } catch (e) {
+                medsData.regular = appData.currentPatient.medications || '';
+            }
+        }
+    }
+
+    regularMeds = medsData.regular || '';
+    prnMeds = medsData.prn || '';
+
+    // Combine for processing (we generally focus on Regular for discharge plan, but include PRN if relevant?)
+    // User request: "medications the patient takes... analgesics, anticoagulants..."
+    // Let's combine line by line to categorize.
+    const allMeds = (regularMeds + '\n' + prnMeds).split('\n');
+
+    const categorized = {
+        analgesics: [],
+        antiemetics: [],
+        anxiolytics: [],
+        sleep: [],
+        anticoagulants: [],
+        others: []
+    };
+
+    // Keyword Matchers
+    const keywords = {
+        analgesics: ['morphine', 'oxycodone', 'hydromorphone', 'fentanyl', 'codeine', 'tramadol', 'methadone', 'paracetamol', 'panadol', 'acetaminophen', 'ibuprofen', 'diclofenac', 'celebrex', 'lyrica', 'pregabalin', 'gabapentin', 'mst', 'sevredol', 'oxynorm', 'targin', 'jurnista', 'durogesic'],
+        antiemetics: ['metoclopramide', 'plasil', 'primperan', 'ondansetron', 'zofran', 'haloperidol', 'haldol', 'levomepromazine', 'nozinan', 'cyclizine', 'domperidone', 'motilium', 'dexamethasone'],
+        anxiolytics: ['midazolam', 'lorazepam', 'ativan', 'diazepam', 'valium', 'alprazolam', 'xanax', 'clonazepam', 'rivotril', 'buspirone'],
+        sleep: ['zopiclone', 'imovane', 'zolpidem', 'stilnoct', 'melatonin', 'circadin', 'quetiapine', 'seroquel', 'mirtazapine', 'remeron', 'trazodone'],
+        anticoagulants: ['enoxaparin', 'clexane', 'heparin', 'warfarin', 'coumadin', 'rivaroxaban', 'xarelto', 'apixaban', 'eliquis', 'dabigatran', 'pradaxa', 'aspirin', 'clopidogrel', 'plavix']
+    };
+
+    allMeds.forEach(line => {
+        const cleanLine = line.trim();
+        if (!cleanLine) return;
+        const lower = cleanLine.toLowerCase();
+
+        // Categorize
+        let matched = false;
+
+        // Check Analgesics
+        if (keywords.analgesics.some(k => lower.includes(k))) {
+            categorized.analgesics.push(cleanLine);
+            matched = true;
+        }
+        // Check Antiemetics
+        else if (keywords.antiemetics.some(k => lower.includes(k))) {
+            categorized.antiemetics.push(cleanLine);
+            matched = true;
+        }
+        // Check Anxiolytics
+        else if (keywords.anxiolytics.some(k => lower.includes(k))) {
+            categorized.anxiolytics.push(cleanLine);
+            matched = true;
+        }
+        // Check Sleep
+        else if (keywords.sleep.some(k => lower.includes(k))) {
+            categorized.sleep.push(cleanLine);
+            matched = true;
+        }
+        // Check Anticoagulants
+        else if (keywords.anticoagulants.some(k => lower.includes(k))) {
+            categorized.anticoagulants.push(cleanLine);
+            matched = true;
+        }
+
+        // If not matched, goes to Others
+        if (!matched) {
+            categorized.others.push(cleanLine);
+        }
+    });
+
+    // Populate Fields
+    document.getElementById('dp-analgesics').value = categorized.analgesics.join('\n');
+    document.getElementById('dp-antiemetics').value = categorized.antiemetics.join('\n');
+    document.getElementById('dp-anxiolytics').value = categorized.anxiolytics.join('\n');
+    document.getElementById('dp-sleep').value = categorized.sleep.join('\n');
+    document.getElementById('dp-anticoagulants').value = categorized.anticoagulants.join('\n');
+    document.getElementById('dp-others').value = categorized.others.join('\n');
+
+    // Show Modal
+    document.getElementById('discharge-modal').classList.remove('hidden');
+
+    // Reset Copy Status
+    document.getElementById('dp-copy-status').classList.remove('opacity-100');
+    document.getElementById('dp-copy-status').classList.add('opacity-0');
+}
+
+function closeDischargePlanModal() {
+    document.getElementById('discharge-modal').classList.add('hidden');
+}
+
+function copyDischargePlan() {
+    const analgesics = document.getElementById('dp-analgesics').value.trim();
+    const anticoagulants = document.getElementById('dp-anticoagulants').value.trim();
+    const antiemetics = document.getElementById('dp-antiemetics').value.trim();
+    const anxiolytics = document.getElementById('dp-anxiolytics').value.trim();
+    const sleep = document.getElementById('dp-sleep').value.trim();
+    const others = document.getElementById('dp-others').value.trim();
+
+    let plan = `PALLIATIVE DISCHARGE MEDICATION PLAN\nfor ${appData.currentPatient ? appData.currentPatient.name : 'Patient'}\n----------------------------------------\n`;
+
+    if (analgesics) plan += `\nANALGESICS (PAIN):\n${analgesics}\n`;
+    if (anticoagulants) plan += `\nANTICOAGULANTS (BLOOD THINNERS):\n${anticoagulants}\n`;
+    if (antiemetics) plan += `\nANTIEMETICS (NAUSEA/VOMITING):\n${antiemetics}\n`;
+    if (anxiolytics) plan += `\nANXIOLYTICS (ANXIETY/RESTLESSNESS):\n${anxiolytics}\n`;
+    if (sleep) plan += `\nSLEEP AIDS / SEDATIVES:\n${sleep}\n`;
+
+    if (others) plan += `\nOTHER MEDICATIONS:\n${others}\n`;
+
+    plan += `\n----------------------------------------\nGenerated on ${new Date().toLocaleDateString()}`;
+
+    // Copy to clipboard
+    navigator.clipboard.writeText(plan).then(() => {
+        const status = document.getElementById('dp-copy-status');
+        status.classList.remove('opacity-0');
+        status.classList.add('opacity-100');
+
+        setTimeout(() => {
+            status.classList.add('opacity-0');
+            status.classList.remove('opacity-100');
+        }, 3000);
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+        alert("Failed to copy to clipboard");
+    });
+}
