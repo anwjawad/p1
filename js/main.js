@@ -2017,79 +2017,54 @@ function openDischargePlanModal() {
     regularMeds = medsData.regular || '';
     prnMeds = medsData.prn || '';
 
-    // Combine for processing (we generally focus on Regular for discharge plan, but include PRN if relevant?)
-    // User request: "medications the patient takes... analgesics, anticoagulants..."
-    // Let's combine line by line to categorize.
-    const allMeds = (regularMeds + '\n' + prnMeds).split('\n');
-
-    const categorized = {
-        analgesics: [],
-        antiemetics: [],
-        anxiolytics: [],
-        sleep: [],
-        anticoagulants: [],
-        others: []
-    };
-
-    // Keyword Matchers
-    const keywords = {
-        analgesics: ['morphine', 'oxycodone', 'hydromorphone', 'fentanyl', 'codeine', 'tramadol', 'methadone', 'paracetamol', 'panadol', 'acetaminophen', 'ibuprofen', 'diclofenac', 'celebrex', 'lyrica', 'pregabalin', 'gabapentin', 'mst', 'sevredol', 'oxynorm', 'targin', 'jurnista', 'durogesic'],
-        antiemetics: ['metoclopramide', 'plasil', 'primperan', 'ondansetron', 'zofran', 'haloperidol', 'haldol', 'levomepromazine', 'nozinan', 'cyclizine', 'domperidone', 'motilium', 'dexamethasone'],
-        anxiolytics: ['midazolam', 'lorazepam', 'ativan', 'diazepam', 'valium', 'alprazolam', 'xanax', 'clonazepam', 'rivotril', 'buspirone'],
-        sleep: ['zopiclone', 'imovane', 'zolpidem', 'stilnoct', 'melatonin', 'circadin', 'quetiapine', 'seroquel', 'mirtazapine', 'remeron', 'trazodone'],
-        anticoagulants: ['enoxaparin', 'clexane', 'heparin', 'warfarin', 'coumadin', 'rivaroxaban', 'xarelto', 'apixaban', 'eliquis', 'dabigatran', 'pradaxa', 'aspirin', 'clopidogrel', 'plavix']
-    };
-
-    allMeds.forEach(line => {
-        const cleanLine = line.trim();
-        if (!cleanLine) return;
-        const lower = cleanLine.toLowerCase();
-
-        // Categorize
-        let matched = false;
-
-        // Check Analgesics
-        if (keywords.analgesics.some(k => lower.includes(k))) {
-            categorized.analgesics.push(cleanLine);
-            matched = true;
-        }
-        // Check Antiemetics
-        else if (keywords.antiemetics.some(k => lower.includes(k))) {
-            categorized.antiemetics.push(cleanLine);
-            matched = true;
-        }
-        // Check Anxiolytics
-        else if (keywords.anxiolytics.some(k => lower.includes(k))) {
-            categorized.anxiolytics.push(cleanLine);
-            matched = true;
-        }
-        // Check Sleep
-        else if (keywords.sleep.some(k => lower.includes(k))) {
-            categorized.sleep.push(cleanLine);
-            matched = true;
-        }
-        // Check Anticoagulants
-        else if (keywords.anticoagulants.some(k => lower.includes(k))) {
-            categorized.anticoagulants.push(cleanLine);
-            matched = true;
-        }
-
-        // If not matched, goes to Others
-        if (!matched) {
-            categorized.others.push(cleanLine);
-        }
+    // Show Loading State
+    document.getElementById('discharge-modal').classList.remove('hidden');
+    // We need to inject a loading overlay or use existing fields to show loading
+    // Let's clear fields and set placeholder "Loading..."
+    const fields = ['dp-analgesics', 'dp-antiemetics', 'dp-anxiolytics', 'dp-sleep', 'dp-anticoagulants', 'dp-others'];
+    fields.forEach(id => {
+        document.getElementById(id).value = "Loading AI analysis...";
+        document.getElementById(id).disabled = true;
     });
 
-    // Populate Fields
-    document.getElementById('dp-analgesics').value = categorized.analgesics.join('\n');
-    document.getElementById('dp-antiemetics').value = categorized.antiemetics.join('\n');
-    document.getElementById('dp-anxiolytics').value = categorized.anxiolytics.join('\n');
-    document.getElementById('dp-sleep').value = categorized.sleep.join('\n');
-    document.getElementById('dp-anticoagulants').value = categorized.anticoagulants.join('\n');
-    document.getElementById('dp-others').value = categorized.others.join('\n');
+    const allMedsText = regularMeds + '\n' + prnMeds;
 
-    // Show Modal
-    document.getElementById('discharge-modal').classList.remove('hidden');
+    // AI CALL with Client-Side Fallback
+    fetch(GAS_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            action: 'generate_plan',
+            medications: allMedsText
+        })
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success' && data.data) {
+                const cat = data.data;
+                // Populate
+                document.getElementById('dp-analgesics').value = Array.isArray(cat.analgesics) ? cat.analgesics.join('\n') : (cat.analgesics || '');
+                document.getElementById('dp-anticoagulants').value = Array.isArray(cat.anticoagulants) ? cat.anticoagulants.join('\n') : (cat.anticoagulants || '');
+                document.getElementById('dp-antiemetics').value = Array.isArray(cat.antiemetics) ? cat.antiemetics.join('\n') : (cat.antiemetics || '');
+                document.getElementById('dp-anxiolytics').value = Array.isArray(cat.anxiolytics) ? cat.anxiolytics.join('\n') : (cat.anxiolytics || '');
+                document.getElementById('dp-sleep').value = Array.isArray(cat.sleep) ? cat.sleep.join('\n') : (cat.sleep || '');
+                document.getElementById('dp-others').value = Array.isArray(cat.others) ? cat.others.join('\n') : (cat.others || '');
+            } else {
+                console.warn("AI Backend Error/Old Version:", data);
+                runClientSideCategorization(allMedsText);
+            }
+        })
+        .catch(err => {
+            console.error("AI Fetch Error (Network/CORS):", err);
+            runClientSideCategorization(allMedsText);
+        })
+        .finally(() => {
+            // Enable fields
+            fields.forEach(id => {
+                if (document.getElementById(id).value === "Loading AI analysis...") document.getElementById(id).value = "";
+                document.getElementById(id).disabled = false;
+            });
+        });
 
     // Reset Copy Status
     document.getElementById('dp-copy-status').classList.remove('opacity-100');
@@ -2134,4 +2109,156 @@ function copyDischargePlan() {
         console.error('Failed to copy: ', err);
         alert("Failed to copy to clipboard");
     });
+}
+
+// Fallback logic
+function runClientSideCategorization(text) {
+    const lines = text.split('\n');
+    const categorized = {
+        analgesics: [], antiemetics: [], anxiolytics: [], sleep: [], anticoagulants: [], others: []
+    };
+
+    const keywords = {
+        analgesics: ['morphine', 'oxycodone', 'hydromorphone', 'fentanyl', 'codeine', 'tramadol', 'methadone', 'paracetamol', 'panadol', 'acetaminophen', 'ibuprofen', 'diclofenac', 'celebrex', 'lyrica', 'pregabalin', 'gabapentin', 'mst', 'sevredol', 'oxynorm', 'targin', 'jurnista', 'durogesic', 'naxyn', 'naproxen', 'optalgin', 'dipyrone', 'perfalgan', 'acamol', 'tramadex', 'tramal', 'percocet', 'oxycontin', 'oxycod', 'fenta', 'rokal'],
+        antiemetics: ['metoclopramide', 'plasil', 'primperan', 'ondansetron', 'zofran', 'haloperidol', 'haldol', 'levomepromazine', 'nozinan', 'cyclizine', 'domperidone', 'motilium', 'dexamethasone', 'dexamethazone', 'pramin'],
+        anxiolytics: ['midazolam', 'lorazepam', 'ativan', 'diazepam', 'valium', 'alprazolam', 'xanax', 'clonazepam', 'rivotril', 'buspirone', 'midolam', 'assival', 'vaben'],
+        sleep: ['zopiclone', 'imovane', 'zolpidem', 'stilnoct', 'melatonin', 'circadin', 'quetiapine', 'seroquel', 'mirtazapine', 'remeron', 'trazodone', 'nocturno', 'bondormin'],
+        anticoagulants: ['enoxaparin', 'clexane', 'heparin', 'warfarin', 'coumadin', 'rivaroxaban', 'xarelto', 'apixaban', 'eliquis', 'dabigatran', 'pradaxa', 'aspirin', 'clopidogrel', 'plavix']
+    };
+
+    lines.forEach(line => {
+        const cleanLine = line.trim();
+        if (!cleanLine) return;
+        const lower = cleanLine.toLowerCase();
+        let matched = false;
+
+        if (keywords.analgesics.some(k => lower.includes(k))) { categorized.analgesics.push(cleanLine); matched = true; }
+        else if (keywords.antiemetics.some(k => lower.includes(k))) { categorized.antiemetics.push(cleanLine); matched = true; }
+        else if (keywords.anxiolytics.some(k => lower.includes(k))) { categorized.anxiolytics.push(cleanLine); matched = true; }
+        else if (keywords.sleep.some(k => lower.includes(k))) { categorized.sleep.push(cleanLine); matched = true; }
+        else if (keywords.anticoagulants.some(k => lower.includes(k))) { categorized.anticoagulants.push(cleanLine); matched = true; }
+
+        if (!matched) categorized.others.push(cleanLine);
+    });
+
+    document.getElementById('dp-analgesics').value = categorized.analgesics.join('\n');
+    document.getElementById('dp-antiemetics').value = categorized.antiemetics.join('\n');
+    document.getElementById('dp-anxiolytics').value = categorized.anxiolytics.join('\n');
+    document.getElementById('dp-sleep').value = categorized.sleep.join('\n');
+    document.getElementById('dp-anticoagulants').value = categorized.anticoagulants.join('\n');
+    document.getElementById('dp-others').value = categorized.others.join('\n');
+}
+
+// --------------------------------------------------------
+// AI COMMAND CENTER LOGIC
+// --------------------------------------------------------
+
+function openAIHub() {
+    // Requires a patient to be selected (currently opened in modal context or global context)
+    // Assuming context is appData.currentPatient
+
+    if (!appData.currentPatient) {
+        alert("Please select a patient first.");
+        return;
+    }
+
+    document.getElementById('ai-patient-name').textContent = appData.currentPatient.name;
+    document.getElementById('ai-hub-modal').classList.remove('hidden');
+
+    // Reset View
+    document.getElementById('ai-placeholder').classList.remove('hidden');
+    document.getElementById('ai-loading').classList.add('hidden');
+    document.getElementById('ai-result-container').classList.add('hidden');
+    document.getElementById('ai-result-container').innerHTML = "";
+}
+
+function closeAIHub() {
+    document.getElementById('ai-hub-modal').classList.add('hidden');
+}
+
+function triggerAIAction(actionType) {
+    if (actionType === 'discharge') {
+        // Switch to the other modal
+        closeAIHub();
+        openDischargePlanModal();
+        return;
+    }
+
+    // UI State: Loading
+    document.getElementById('ai-placeholder').classList.add('hidden');
+    document.getElementById('ai-loading').classList.remove('hidden');
+    document.getElementById('ai-result-container').classList.add('hidden');
+
+    const actionMap = {
+        'summary': 'generate_summary',
+        'suggestions': 'generate_suggestions'
+    };
+
+    const serverAction = actionMap[actionType];
+
+    // Prepare Data
+    // We send the full patient object for context
+    const payload = {
+        action: serverAction,
+        patient: appData.currentPatient
+    };
+
+    fetch(GAS_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+        .then(response => response.json())
+        .then(data => {
+            // UI State: Result
+            document.getElementById('ai-loading').classList.add('hidden');
+            document.getElementById('ai-result-container').classList.remove('hidden');
+
+            if (data.status === 'success' && data.data) {
+                // Render Markdown (Simple Converter)
+                renderAIResponse(data.data);
+
+                // If it's the suggestions, we might want to save it to notes? 
+                // For now just display.
+            } else {
+                console.warn("AI Error:", data);
+                document.getElementById('ai-result-container').innerHTML = `
+                <div class="p-4 bg-red-50 text-red-600 rounded-xl border border-red-200">
+                    <i class="fa-solid fa-triangle-exclamation mr-2"></i>
+                    <strong>AI Error:</strong> ${data.message || "Unknown error from backend."}
+                    <br><span class="text-xs mt-1 block opacity-75">Did you update the Google Apps Script? (v3)</span>
+                </div>
+            `;
+            }
+        })
+        .catch(err => {
+            console.error("Network Error:", err);
+            document.getElementById('ai-loading').classList.add('hidden');
+            document.getElementById('ai-result-container').classList.remove('hidden');
+            document.getElementById('ai-result-container').innerHTML = `
+            <div class="p-4 bg-red-50 text-red-600 rounded-xl border border-red-200">
+                <i class="fa-solid fa-wifi mr-2"></i>
+                <strong>Connection Failed:</strong> Could not reach AI service.
+            </div>
+        `;
+        });
+}
+
+function renderAIResponse(markdownText) {
+    // Simple/Safe Markdown-to-HTML parser for basic formatting
+    let html = markdownText
+        // Headers
+        .replace(/^### (.*$)/gim, '<h3 class="text-lg font-bold text-slate-800 mt-4 mb-2">$1</h3>')
+        .replace(/^## (.*$)/gim, '<h2 class="text-xl font-bold text-violet-700 mt-5 mb-3">$1</h2>')
+        .replace(/^# (.*$)/gim, '<h1 class="text-2xl font-bold text-slate-800 mb-4">$1</h1>')
+        // Bold
+        .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
+        // Italic
+        .replace(/\*(.*)\*/gim, '<em>$1</em>')
+        // Lists
+        .replace(/^\s*-\s+(.*)/gim, '<li class="ml-4 list-disc marker:text-violet-500">$1</li>')
+        // Newlines to breaks
+        .replace(/\n/gim, '<br>');
+
+    document.getElementById('ai-result-container').innerHTML = html;
 }
