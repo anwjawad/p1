@@ -2262,3 +2262,111 @@ function renderAIResponse(markdownText) {
 
     document.getElementById('ai-result-container').innerHTML = html;
 }
+
+// --------------------------------------------------------
+// RESOURCES (SHARED DRIVE) LOGIC
+// --------------------------------------------------------
+
+function openResourcesModal() {
+    document.getElementById('resources-modal').classList.remove('hidden');
+    // Load saved folder ID if exists
+    const savedId = localStorage.getItem('drive_folder_id');
+    if (savedId) {
+        document.getElementById('drive-folder-id').value = savedId;
+        // Optional: Auto-fetch? Maybe not, prevents spamming if ID is wrong
+    }
+}
+
+function closeResourcesModal() {
+    document.getElementById('resources-modal').classList.add('hidden');
+}
+
+function fetchResources() {
+    const folderId = document.getElementById('drive-folder-id').value.trim();
+    if (!folderId) {
+        alert("Please enter a Google Drive Folder ID.");
+        return;
+    }
+
+    // Save for next time
+    localStorage.setItem('drive_folder_id', folderId);
+
+    // UI Loading
+    document.getElementById('resources-list').innerHTML = "";
+    document.getElementById('resources-loading').classList.remove('hidden');
+    document.getElementById('resources-count').textContent = "Searching...";
+
+    fetch(GAS_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // CORS fix
+        body: JSON.stringify({ action: 'get_files', folderId: folderId })
+    })
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('resources-loading').classList.add('hidden');
+
+            if (data.status === 'success' && data.files) {
+                renderResources(data.files);
+            } else {
+                document.getElementById('resources-list').innerHTML = `
+                <div class="text-center py-6 text-red-500">
+                    <i class="fa-solid fa-triangle-exclamation text-2xl mb-2"></i>
+                    <p>Error: ${data.message || "Could not fetch files"}</p>
+                </div>
+            `;
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            document.getElementById('resources-loading').classList.add('hidden');
+            alert("Network Error: " + err.message);
+        });
+}
+
+function renderResources(files) {
+    const list = document.getElementById('resources-list');
+    list.innerHTML = "";
+
+    if (files.length === 0) {
+        list.innerHTML = `
+            <div class="text-center py-10 text-slate-400">
+                <p>No files found in this folder.</p>
+            </div>
+        `;
+        document.getElementById('resources-count').textContent = "0 items";
+        return;
+    }
+
+    document.getElementById('resources-count').textContent = `${files.length} items found`;
+
+    files.forEach(file => {
+        // Icon selection based on mimeType
+        let iconClass = "fa-file text-slate-400";
+        if (file.mimeType.includes("pdf")) iconClass = "fa-file-pdf text-red-500";
+        else if (file.mimeType.includes("sheet") || file.mimeType.includes("csv")) iconClass = "fa-file-excel text-green-600";
+        else if (file.mimeType.includes("doc")) iconClass = "fa-file-word text-blue-600";
+        else if (file.mimeType.includes("image")) iconClass = "fa-file-image text-purple-500";
+
+        const div = document.createElement('div');
+        div.className = "flex items-center justify-between p-3 bg-white border border-slate-100 rounded-xl hover:shadow-md transition-shadow group";
+        div.innerHTML = `
+            <div class="flex items-center gap-3 overflow-hidden">
+                <div class="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center shrink-0">
+                    <i class="fa-solid ${iconClass} text-xl group-hover:scale-110 transition-transform"></i>
+                </div>
+                <div class="truncate">
+                    <h4 class="font-bold text-slate-700 text-sm truncate" title="${file.name}">${file.name}</h4>
+                    <p class="text-[10px] text-slate-400">
+                        ${(file.size / 1024).toFixed(0)} KB • 
+                        Updated: ${new Date(file.lastUpdated).toLocaleDateString()}
+                    </p>
+                </div>
+            </div>
+            <a href="${file.url}" target="_blank" 
+                class="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors">
+                Open <i class="fa-solid fa-external-link-alt ml-1"></i>
+            </a>
+        `;
+        list.appendChild(div);
+    });
+}

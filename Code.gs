@@ -1,10 +1,10 @@
 /**
- * Palliative Care Rounds - Robust Backend V4 (CORS Fix)
+ * Palliative Care Rounds - Robust Backend V5 (Syntax Fix)
  */
 
-const SHEET_NAME = 'Patients';
-const LOCK_WAIT_MS = 10000;
-const GEMINI_API_KEY = 'AIzaSyDyxZSczhZoJ7OnIJxwV053VnFSzG2j6MY'; 
+var SHEET_NAME = 'Patients';
+var LOCK_WAIT_MS = 10000;
+var GEMINI_API_KEY = 'AIzaSyDyxZSczhZoJ7OnIJxwV053VnFSzG2j6MY'; 
 
 // --- CORS Config ---
 function doOptions(e) {
@@ -16,13 +16,29 @@ function doOptions(e) {
   return ContentService.createTextOutput("").setMimeType(ContentService.MimeType.TEXT);
 }
 
+// --- Auth Helper ---
+function forceAuth() {
+  UrlFetchApp.fetch("https://www.google.com");
+  console.log("Auth Successful!");
+}
+
+function testConnection() {
+  console.log("Testing Gemini Connection...");
+  try {
+    var result = callGemini("Say hello");
+    console.log("Success: " + result);
+  } catch (e) {
+    console.error("Error: " + e.toString());
+  }
+}
+
 // --- Main Handlers ---
 
 function doGet(e) {
-  const lock = LockService.getScriptLock();
+  var lock = LockService.getScriptLock();
   if (lock.tryLock(LOCK_WAIT_MS)) {
     try {
-      const data = getAllPatients();
+      var data = getAllPatients();
       return corsJsonResponse(data);
     } catch (err) {
       return corsJsonResponse({ error: err.toString() });
@@ -35,17 +51,17 @@ function doGet(e) {
 }
 
 function doPost(e) {
-  const lock = LockService.getScriptLock();
+  var lock = LockService.getScriptLock();
   
   if (lock.tryLock(LOCK_WAIT_MS)) {
     try {
       if (!e.postData || !e.postData.contents) {
         throw new Error("No data received");
       }
-      const data = JSON.parse(e.postData.contents);
-      const action = data.action || 'update'; 
+      var data = JSON.parse(e.postData.contents);
+      var action = data.action || 'update'; 
 
-      let result;
+      var result;
       // --- ROUTING ---
       switch (action) {
         case 'import':
@@ -63,6 +79,12 @@ function doPost(e) {
            break;
         case 'generate_suggestions':
            result = handleGenerateSuggestions(data.patient);
+           break;
+        case 'reset_day':
+           result = handleDailyReset();
+           break;
+        case 'get_files':
+           result = handleGetDriveFiles(data.folderId);
            break;
         default:
           // Single Update
@@ -84,53 +106,63 @@ function doPost(e) {
 // --- AI Handlers ---
 
 function callGemini(prompt) {
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + GEMINI_API_KEY;
+  var payload = {
+    contents: [{
+      parts: [{ text: prompt }]
+    }]
+  };
+
+  var options = {
+    'method': 'post',
+    'contentType': 'application/json',
+    'payload': JSON.stringify(payload),
+    'muteHttpExceptions': true
+  };
+
+  var response = UrlFetchApp.fetch(url, options);
+  var code = response.getResponseCode();
+  var text = response.getContentText();
+
+  if (code === 429) {
+     throw new Error("AI is busy (Rate Limit). Please wait a minute and try again.");
+  }
+  
+  if (code !== 200) {
+     throw new Error("AI Error (" + code + "): " + text);
+  }
+
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-    const payload = {
-      contents: [{
-        parts: [{ text: prompt }]
-      }]
-    };
-
-    const options = {
-      'method': 'post',
-      'contentType': 'application/json',
-      'payload': JSON.stringify(payload)
-    };
-
-    const response = UrlFetchApp.fetch(url, options);
-    const json = JSON.parse(response.getContentText());
+    var json = JSON.parse(text);
+    if (!json.candidates || !json.candidates[0] || !json.candidates[0].content) {
+       throw new Error("AI returned no content. Please try again.");
+    }
     return json.candidates[0].content.parts[0].text;
-
   } catch (e) {
-    throw new Error('AI Generation Failed: ' + e.toString());
+    throw new Error("Failed to parse AI response: " + e.message);
   }
 }
 
 function handleGenerateDischargePlan(medicationsText) {
   if (!medicationsText) return { status: 'error', message: 'No medications provided' };
 
-  const prompt = `
-    You are a medical assistant for palliative care. 
-    Analyze the following list of medications and categorize them into a JSON object with these exact keys:
-    - analgesics (for pain, e.g., opioids, paracetamol, NSAIDs, Optalgin)
-    - antiemetics (for nausea/vomiting, e.g., Pramin, Zofran)
-    - anxiolytics (for anxiety/agitation, e.g., Benzos, Midolam)
-    - sleep (for insomnia, e.g., Nocturno, Bondormin)
-    - anticoagulants (blood thinners, e.g., Clexane, Eliquis)
-    - others (any other medication)
-
-    Return ONLY the raw JSON object. No markdown, no "json" prefix.
-    
-    Medications:
-    ${medicationsText}
-  `;
+  var prompt = 
+    "You are a medical assistant for palliative care.\n" +
+    "Analyze the following list of medications and categorize them into a JSON object with these exact keys:\n" +
+    "- analgesics (for pain, e.g., opioids, paracetamol, NSAIDs, Optalgin)\n" +
+    "- antiemetics (for nausea/vomiting, e.g., Pramin, Zofran)\n" +
+    "- anxiolytics (for anxiety/agitation, e.g., Benzos, Midolam)\n" +
+    "- sleep (for insomnia, e.g., Nocturno, Bondormin)\n" +
+    "- anticoagulants (blood thinners, e.g., Clexane, Eliquis)\n" +
+    "- others (any other medication)\n\n" +
+    "Return ONLY the raw JSON object. No markdown, no 'json' prefix.\n\n" +
+    "Medications:\n" + medicationsText;
 
   try {
-    let aiText = callGemini(prompt);
+    var aiText = callGemini(prompt);
     // Cleanup
     aiText = aiText.replace(/```json/g, '').replace(/```/g, '').trim();
-    const categorized = JSON.parse(aiText);
+    var categorized = JSON.parse(aiText);
     return { status: 'success', data: categorized };
   } catch (e) {
     return { status: 'error', message: e.message };
@@ -141,35 +173,30 @@ function handleGenerateSummary(patient) {
   if (!patient) return { status: 'error', message: 'No patient data' };
   
   // Construct patient context
-  const context = `
-    Name: ${patient.name}
-    Age: ${patient.age}
-    Diagnosis: ${patient.diagnosis}
-    Room: ${patient.room}
-    Ward: ${patient.ward}
-    Current Symptoms: ${JSON.stringify(patient.symptoms || {})}
-    Labs: ${JSON.stringify(patient.labs || {})}
-    Medications: ${patient.medications}
-    Notes: ${patient.notes}
-  `;
+  var context = 
+    "Name: " + patient.name + "\n" +
+    "Age: " + patient.age + "\n" +
+    "Diagnosis: " + patient.diagnosis + "\n" +
+    "Room: " + patient.room + "\n" +
+    "Ward: " + patient.ward + "\n" +
+    "Current Symptoms: " + JSON.stringify(patient.symptoms || {}) + "\n" +
+    "Labs: " + JSON.stringify(patient.labs || {}) + "\n" +
+    "Medications: " + patient.medications + "\n" +
+    "Notes: " + patient.notes;
 
-  const prompt = `
-    You are a compassionate palliative care consultant.
-    Please write a professional, concise daily clinical summary for this patient.
-    Focus on:
-    1. Primary diagnosis and current status.
-    2. Key symptom burden (highlight severe symptoms).
-    3. Notable medication changes or high-alert meds (opioids).
-    4. Provide a brief "One-Liner" at the top.
-    
-    Format nicely with Markdown (bolding key terms).
-    
-    Patient Data:
-    ${context}
-  `;
+  var prompt = 
+    "You are a compassionate palliative care consultant.\n" +
+    "Please write a professional, concise daily clinical summary for this patient.\n" +
+    "Focus on:\n" +
+    "1. Primary diagnosis and current status.\n" +
+    "2. Key symptom burden (highlight severe symptoms).\n" +
+    "3. Notable medication changes or high-alert meds (opioids).\n" +
+    "4. Provide a brief 'One-Liner' at the top.\n\n" +
+    "Format nicely with Markdown (bolding key terms).\n\n" +
+    "Patient Data:\n" + context;
 
   try {
-    const summary = callGemini(prompt);
+    var summary = callGemini(prompt);
     return { status: 'success', data: summary };
   } catch (e) {
     return { status: 'error', message: e.message };
@@ -179,33 +206,106 @@ function handleGenerateSummary(patient) {
 function handleGenerateSuggestions(patient) {
   if (!patient) return { status: 'error', message: 'No patient data' };
   
-  const context = `
-    Name: ${patient.name}
-    Diagnosis: ${patient.diagnosis}
-    Symptoms: ${JSON.stringify(patient.symptoms || {})}
-    Labs: ${JSON.stringify(patient.labs || {})}
-    Current Meds: ${patient.medications}
-  `;
+  var context = 
+    "Name: " + patient.name + "\n" +
+    "Diagnosis: " + patient.diagnosis + "\n" +
+    "Symptoms: " + JSON.stringify(patient.symptoms || {}) + "\n" +
+    "Labs: " + JSON.stringify(patient.labs || {}) + "\n" +
+    "Current Meds: " + patient.medications;
 
-  const prompt = `
-    You are an expert palliative care AI assistant.
-    Based on this patient's data, suggest 3-5 specific care implementations or medication adjustments.
-    Consider:
-    - Uncontrolled symptoms (e.g., if pain is high, suggest titration or adjuvants).
-    - Potential side effects (e.g., if on opioids, ensure laxatives are prescribed).
-    - Lab abnormalities (e.g., hypercalcemia, hyponatremia).
-    
-    Be concise and actionable. Use bullet points.
-    
-    Patient Data:
-    ${context}
-  `;
+  var prompt = 
+    "You are an expert palliative care AI assistant.\n" +
+    "Based on this patient's data, suggest 3-5 specific care implementations or medication adjustments.\n" +
+    "Consider:\n" +
+    "- Uncontrolled symptoms (e.g., if pain is high, suggest titration or adjuvants).\n" +
+    "- Potential side effects (e.g., if on opioids, ensure laxatives are prescribed).\n" +
+    "- Lab abnormalities (e.g., hypercalcemia, hyponatremia).\n\n" +
+    "Be concise and actionable. Use bullet points.\n\n" +
+    "Patient Data:\n" + context;
 
   try {
-    const suggestions = callGemini(prompt);
+    var suggestions = callGemini(prompt);
     return { status: 'success', data: suggestions };
   } catch (e) {
     return { status: 'error', message: e.message };
+  }
+}
+
+function handleDailyReset() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = getWorkingSheet();
+  var historySheet = ss.getSheetByName('History_Log');
+  if (!historySheet) {
+    historySheet = ss.insertSheet('History_Log');
+    historySheet.appendRow(['Date', 'Patient Name', 'ID', 'Diagnosis', 'Notes', 'Medications', 'Symptoms', 'Labs']);
+  }
+  
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+  var symptomsIdx = headers.indexOf('symptoms');
+  var labsIdx = headers.indexOf('labs');
+  
+  // Archive
+  var timestamp = new Date();
+  var archiveData = [];
+  
+  // Skip header, start at row 1
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    // Map to History Columns: Date, Name, ID, Diagnosis, Notes, Meds, Symptoms, Labs
+    archiveData.push([
+      timestamp,
+      row[headers.indexOf('name')],
+      row[headers.indexOf('id')],
+      row[headers.indexOf('diagnosis')],
+      row[headers.indexOf('notes')],
+      row[headers.indexOf('medications')],
+      row[headers.indexOf('symptoms')],
+      row[headers.indexOf('labs')]
+    ]);
+    
+    // Reset Logic in memory
+    if (symptomsIdx > -1) row[symptomsIdx] = '';
+    if (labsIdx > -1) row[labsIdx] = '';
+  }
+  
+  // Write Archive
+  if (archiveData.length > 0) {
+    historySheet.getRange(historySheet.getLastRow() + 1, 1, archiveData.length, archiveData[0].length).setValues(archiveData);
+  }
+  
+  // Updates Main Sheet (FULL WIPE)
+  // User requested to clear everything (Patients, Meds, etc) to start fresh.
+  if (data.length > 1) {
+     // Clear everything from Row 2 downwards
+     sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();
+  }
+  
+  return { status: 'success', archived_count: archiveData.length };
+}
+
+function handleGetDriveFiles(folderId) {
+  if (!folderId) return { status: 'error', message: 'No Folder ID provided' };
+  
+  try {
+    var folder = DriveApp.getFolderById(folderId);
+    var files = folder.getFiles();
+    var fileList = [];
+    
+    while (files.hasNext()) {
+      var file = files.next();
+      fileList.push({
+        name: file.getName(),
+        url: file.getUrl(),
+        mimeType: file.getMimeType(),
+        size: file.getSize(), 
+        lastUpdated: file.getLastUpdated()
+      });
+    }
+    
+    return { status: 'success', files: fileList };
+  } catch (e) {
+    return { status: 'error', message: "Drive Error: " + e.message };
   }
 }
 
@@ -216,12 +316,12 @@ function handleImport(patients) {
     return { status: 'success', count: 0, message: 'Nothing to import' };
   }
   
-  const sheet = getWorkingSheet();
-  const headers = ensureHeaders(sheet);
+  var sheet = getWorkingSheet();
+  var headers = ensureHeaders(sheet);
   
-  const rows = patients.map(p => {
-    return headers.map(h => {
-      let val = p[h];
+  var rows = patients.map(function(p) {
+    return headers.map(function(h) {
+      var val = p[h];
       if (typeof val === 'object' && val !== null) {
         val = JSON.stringify(val);
       }
@@ -234,29 +334,29 @@ function handleImport(patients) {
 }
 
 function handleBatchUpdate(updates) {
-  const sheet = getWorkingSheet();
-  const headers = ensureHeaders(sheet);
-  const dataRange = sheet.getDataRange();
-  const values = dataRange.getValues();
+  var sheet = getWorkingSheet();
+  var headers = ensureHeaders(sheet);
+  var dataRange = sheet.getDataRange();
+  var values = dataRange.getValues();
   
-  const idColIdx = headers.indexOf('id');
+  var idColIdx = headers.indexOf('id');
   if (idColIdx === -1) throw new Error("ID column missing in Sheet");
-  const rowMap = new Map();
-  for (let i = 1; i < values.length; i++) {
-    const id = values[i][idColIdx];
+  var rowMap = new Map();
+  for (var i = 1; i < values.length; i++) {
+    var id = values[i][idColIdx];
     if (id) rowMap.set(String(id), i);
   }
   
-  let changed = false;
-  Object.keys(updates).forEach(id => {
+  var changed = false;
+  Object.keys(updates).forEach(function(id) {
     if (rowMap.has(id)) {
-      const rowIndex = rowMap.get(id);
-      const changes = updates[id];
+      var rowIndex = rowMap.get(id);
+      var changes = updates[id];
       
-      Object.keys(changes).forEach(field => {
-        let colIdx = headers.indexOf(field);
+      Object.keys(changes).forEach(function(field) {
+        var colIdx = headers.indexOf(field);
         if (colIdx > -1) {
-          let val = changes[field];
+          var val = changes[field];
           if (typeof val === 'object' && val !== null) val = JSON.stringify(val);
           
           if (values[rowIndex][colIdx] != val) {
@@ -278,24 +378,24 @@ function handleBatchUpdate(updates) {
 function handleSingleUpdate(p) {
   if (!p.id) throw new Error("Patient ID required");
   
-  const sheet = getWorkingSheet();
-  const headers = ensureHeaders(sheet);
+  var sheet = getWorkingSheet();
+  var headers = ensureHeaders(sheet);
   
-  const dataRange = sheet.getDataRange();
-  const values = dataRange.getValues();
-  const idColIdx = headers.indexOf('id');
+  var dataRange = sheet.getDataRange();
+  var values = dataRange.getValues();
+  var idColIdx = headers.indexOf('id');
   
-  let rowIndex = -1;
-  for (let i = 1; i < values.length; i++) {
+  var rowIndex = -1;
+  for (var i = 1; i < values.length; i++) {
     if (String(values[i][idColIdx]) === String(p.id)) {
       rowIndex = i;
       break;
     }
   }
   
-  const newRow = headers.map(h => {
-    let oldVal = (rowIndex > -1) ? values[rowIndex][headers.indexOf(h)] : '';
-    let newVal = p[h];
+  var newRow = headers.map(function(h) {
+    var oldVal = (rowIndex > -1) ? values[rowIndex][headers.indexOf(h)] : '';
+    var newVal = p[h];
     
     if (newVal === undefined) return oldVal; 
     
@@ -313,16 +413,16 @@ function handleSingleUpdate(p) {
 }
 
 function getAllPatients() {
-  const sheet = getWorkingSheet();
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
+  var sheet = getWorkingSheet();
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
   
-  const output = [];
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    const obj = {};
-    headers.forEach((h, idx) => {
-      let val = row[idx];
+  var output = [];
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var obj = {};
+    headers.forEach(function(h, idx) {
+      var val = row[idx];
       if (h === 'labs' || h === 'symptoms' || h === 'history_labs' || h === 'history_symptoms' || (typeof val === 'string' && val.startsWith('{'))) {
         try {
           val = JSON.parse(val);
@@ -337,8 +437,8 @@ function getAllPatients() {
 
 // --- Helpers ---
 function getWorkingSheet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(SHEET_NAME);
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_NAME);
   if (!sheet) {
     sheet = ss.insertSheet(SHEET_NAME);
     ensureHeaders(sheet);
@@ -347,22 +447,22 @@ function getWorkingSheet() {
 }
 
 function ensureHeaders(sheet) {
-  const required = [
+  var required = [
     'id', 'name', 'code', 'ward', 'room', 'age', 
     'diagnosis', 'provider', 'treatment', 'medications', 
     'notes', 'symptoms', 'labs', 'history_symptoms', 'history_labs', 'last_updated'
   ];
   
-  const lastCol = sheet.getLastColumn();
+  var lastCol = sheet.getLastColumn();
   if (lastCol === 0) {
     sheet.appendRow(required);
     return required;
   }
   
-  const range = sheet.getRange(1, 1, 1, lastCol);
-  const currentHeaders = range.getValues()[0];
+  var range = sheet.getRange(1, 1, 1, lastCol);
+  var currentHeaders = range.getValues()[0];
   
-  const missing = required.filter(h => !currentHeaders.includes(h));
+  var missing = required.filter(function(h) { return !currentHeaders.includes(h); });
   if (missing.length > 0) {
     sheet.getRange(1, lastCol + 1, 1, missing.length).setValues([missing]);
     return [...currentHeaders, ...missing];
