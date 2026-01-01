@@ -460,15 +460,24 @@ function openModal(patient) {
 
     // Meds parsing for modal
     let meds = { regular: '', prn: '' };
-    try {
-        if (patient.medications && patient.medications.trim().startsWith('{')) {
-            meds = JSON.parse(patient.medications);
-        } else {
+    // robust assignment
+    if (patient.medications && typeof patient.medications === 'object') {
+        meds = patient.medications;
+    } else {
+        try {
+            if (patient.medications && typeof patient.medications === 'string' && patient.medications.trim().startsWith('{')) {
+                meds = JSON.parse(patient.medications);
+            } else {
+                meds.regular = patient.medications || '';
+            }
+        } catch (e) {
             meds.regular = patient.medications || '';
         }
-    } catch (e) {
-        meds.regular = patient.medications || '';
     }
+
+    // Safety checks
+    if (!meds.regular) meds.regular = '';
+    if (!meds.prn) meds.prn = '';
 
     // Render Meds Inputs
     document.getElementById('inp-medications-regular').value = meds.regular || '';
@@ -1461,14 +1470,18 @@ function openMedicationModal(patient) {
 
     // Parse Data
     let meds = { regular: '', prn: '' };
-    try {
-        if (patient.medications && patient.medications.trim().startsWith('{')) {
-            meds = JSON.parse(patient.medications);
-        } else {
+    if (patient.medications && typeof patient.medications === 'object') {
+        meds = patient.medications;
+    } else {
+        try {
+            if (patient.medications && typeof patient.medications === 'string' && patient.medications.trim().startsWith('{')) {
+                meds = JSON.parse(patient.medications);
+            } else {
+                meds.regular = patient.medications || '';
+            }
+        } catch (e) {
             meds.regular = patient.medications || '';
         }
-    } catch (e) {
-        meds.regular = patient.medications || '';
     }
 
     // Helper to render list
