@@ -1,25 +1,36 @@
 /**
- * Palliative Care Rounds - Robust Backend V3 (AI Command Center)
+ * Palliative Care Rounds - Robust Backend V4 (CORS Fix)
  */
 
-// --- Configuration ---
 const SHEET_NAME = 'Patients';
 const LOCK_WAIT_MS = 10000;
 const GEMINI_API_KEY = 'AIzaSyDyxZSczhZoJ7OnIJxwV053VnFSzG2j6MY'; 
+
+// --- CORS Config ---
+function doOptions(e) {
+  var headers = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type"
+  };
+  return ContentService.createTextOutput("").setMimeType(ContentService.MimeType.TEXT);
+}
+
+// --- Main Handlers ---
 
 function doGet(e) {
   const lock = LockService.getScriptLock();
   if (lock.tryLock(LOCK_WAIT_MS)) {
     try {
       const data = getAllPatients();
-      return jsonResponse(data);
+      return corsJsonResponse(data);
     } catch (err) {
-      return jsonResponse({ error: err.toString() });
+      return corsJsonResponse({ error: err.toString() });
     } finally {
       lock.releaseLock();
     }
   } else {
-    return jsonResponse({ error: "Server busy, please try again." });
+    return corsJsonResponse({ error: "Server busy, please try again." });
   }
 }
 
@@ -58,15 +69,15 @@ function doPost(e) {
           result = handleSingleUpdate(data);
       }
       
-      return jsonResponse(result);
+      return corsJsonResponse(result);
       
     } catch (err) {
-      return jsonResponse({ error: err.toString(), stack: err.stack });
+      return corsJsonResponse({ error: err.toString(), stack: err.stack });
     } finally {
       lock.releaseLock();
     }
   } else {
-    return jsonResponse({ error: "Server busy (Lock Timeout), please try again." });
+    return corsJsonResponse({ error: "Server busy (Lock Timeout), please try again." });
   }
 }
 
@@ -360,7 +371,8 @@ function ensureHeaders(sheet) {
   return currentHeaders;
 }
 
-function jsonResponse(data) {
-  return ContentService.createTextOutput(JSON.stringify(data))
+function corsJsonResponse(data) {
+  var output = JSON.stringify(data);
+  return ContentService.createTextOutput(output)
     .setMimeType(ContentService.MimeType.JSON);
 }

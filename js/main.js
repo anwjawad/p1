@@ -2032,7 +2032,7 @@ function openDischargePlanModal() {
     // AI CALL with Client-Side Fallback
     fetch(GAS_API_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({
             action: 'generate_plan',
             medications: allMedsText
@@ -2205,7 +2205,7 @@ function triggerAIAction(actionType) {
 
     fetch(GAS_API_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(payload)
     })
         .then(response => response.json())
