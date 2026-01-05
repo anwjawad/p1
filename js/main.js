@@ -295,6 +295,8 @@ function renderWardsSidebar() {
         btn.className = `p-3 rounded-lg cursor-pointer transition-all flex justify-between items-center group ward-item relative overflow-hidden mb-2 ${activeClass}`;
         btn.onclick = (e) => {
             if (e.target.closest('.delete-ward-btn')) return;
+            // Ensure we exit analytics view if open
+            if (typeof closeAnalyticsView === 'function') closeAnalyticsView();
             selectWard(wardName);
         }
 
