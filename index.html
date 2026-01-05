@@ -533,8 +533,14 @@
             <div class="flex-1 overflow-y-auto py-2">
                 <div class="flex justify-between items-center px-4 mb-2">
                     <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Wards</h3>
-                    <button onclick="addNewWard()" class="text-slate-400 hover:text-medical-600 text-xs"
-                        title="Add New Ward"><i class="fa-solid fa-plus"></i></button>
+                    <div class="flex gap-1">
+                        <button onclick="quickAddStandardSections()"
+                            class="text-slate-400 hover:text-medical-600 text-xs p-1 rounded hover:bg-slate-100 transition-colors"
+                            title="Quick Add 5 Standard Sections"><i class="fa-solid fa-layer-group"></i></button>
+                        <button onclick="addNewWard()"
+                            class="text-slate-400 hover:text-medical-600 text-xs p-1 rounded hover:bg-slate-100 transition-colors"
+                            title="Add New Ward"><i class="fa-solid fa-plus"></i></button>
+                    </div>
                 </div>
                 <div id="wards-list" class="space-y-1 px-2">
                     <!-- Wards injected via JS -->

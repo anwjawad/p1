@@ -2885,7 +2885,7 @@ function saveQuickPlan(type, value) {
 
     appData.currentPatient.plan.push(newItem);
     savePlanChanges();
-    closePlanModal();
+    // closePlanModal(); // Keep open for multi-select
 
     if (appData.currentWard) renderPatientsGrid(appData.wards[appData.currentWard]);
 }
