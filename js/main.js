@@ -2746,7 +2746,7 @@ function savePlanChanges() {
 function quickAddStandardSections() {
     const standards = [
         { name: 'Medical', color: 'blue', icon: 'stethoscope' },
-        { name: 'Surgical', color: 'green', icon: 'scalpel' },
+        { name: 'Surgical', color: 'green', icon: 'syringe' },
         { name: 'Hematology', color: 'purple', icon: 'flask' },
         { name: 'ICU', color: 'orange', icon: 'heart-pulse' },
         { name: 'Treatment Room', color: 'slate', icon: 'bed-pulse' }
