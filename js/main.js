@@ -2754,14 +2754,24 @@ function quickAddStandardSections() {
 
     let changed = false;
     standards.forEach(s => {
-        if (!appData.sections.find(existing => existing.name === s.name)) {
+        const existing = appData.sections.find(ex => ex.name === s.name);
+        if (existing) {
+            // If it exists but wasn't persistent (hidden because empty), make it persistent
+            if (!existing.isPersistent) {
+                existing.isPersistent = true;
+                existing.color = s.color; // Reset color to standard
+                existing.icon = s.icon;   // Reset icon to standard
+                if (!appData.wards[s.name]) appData.wards[s.name] = [];
+                changed = true;
+            }
+        } else {
+            // New Section
             appData.sections.push({
                 name: s.name,
                 color: s.color,
                 icon: s.icon,
                 isPersistent: true
             });
-            // Init empty array in wards map
             if (!appData.wards[s.name]) appData.wards[s.name] = [];
             changed = true;
         }
@@ -2770,6 +2780,7 @@ function quickAddStandardSections() {
     if (changed) {
         saveMetadata();
         renderWardsSidebar();
+        alert("Standard sections added/restored!");
     } else {
         alert("Standard sections are already added.");
     }
