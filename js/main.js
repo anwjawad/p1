@@ -2772,3 +2772,209 @@ function quickAddStandardSections() {
     renderWardsSidebar();
     alert("Standard sections forced reset and added!");
 }
+
+
+// --------------------------------------------------------
+// ANALYTICS DASHBOARD LOGIC
+// --------------------------------------------------------
+
+let charts = {
+    census: null,
+    symptoms: null,
+    diagnosis: null
+};
+
+function openAnalyticsView() {
+    document.querySelector('main').classList.add('hidden');
+    document.getElementById('analytics-view').classList.remove('hidden');
+    // Hide Sidebar on mobile automatically
+    document.getElementById('sidebar').classList.add('-translate-x-full');
+
+    generateUnitAnalytics();
+}
+
+function closeAnalyticsView() {
+    document.getElementById('analytics-view').classList.add('hidden');
+    document.querySelector('main').classList.remove('hidden');
+}
+
+function refreshAnalytics() {
+    generateUnitAnalytics();
+}
+
+function generateUnitAnalytics() {
+    const patients = appData.patients || [];
+
+    // 1. Diagnosis Distribution
+    const diagnoses = {};
+    patients.forEach(p => {
+        let d = p.diagnosis ? p.diagnosis.split(/[\n,]/)[0].trim() : 'Unspecified'; // Take first line/comma
+        if (!d) d = 'Unspecified';
+        diagnoses[d] = (diagnoses[d] || 0) + 1;
+    });
+
+    // Convert to sorted array
+    const sortedDiag = Object.entries(diagnoses)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 7); // Top 7
+
+    // 2. Symptom Trends (Aggregating CURRENT patients' history + current state)
+    // Note: Since we don't have a real separate 'History Table' for all patients in this frontend app structure,
+    // We will visualize the CURRENT Prevalence of symptoms among active patients.
+    // (To do historical trends, we'd need to parse every patient's history_log).
+
+    // Let's try to parse History for last 7 days if available
+    const last7Days = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        last7Days.push(d.toISOString().split('T')[0]);
+    }
+
+    const symptomTrendData = {
+        'Pain': new Array(7).fill(0),
+        'Nausea': new Array(7).fill(0),
+        'Dyspnea': new Array(7).fill(0),
+        'Constipation': new Array(7).fill(0)
+    };
+
+    patients.forEach(p => {
+        // Parse history if string
+        let history = [];
+        try {
+            if (p.history_symptoms && typeof p.history_symptoms === 'string') {
+                history = JSON.parse(p.history_symptoms); // Expected array of {date: 'YYYY-MM-DD', symptoms: {...}}
+            } else if (Array.isArray(p.history_symptoms)) {
+                history = p.history_symptoms;
+            }
+        } catch (e) { }
+
+        // Add Current Day (simulated as today) to history for charting purposes
+        const todayStr = new Date().toISOString().split('T')[0];
+        history.push({ date: todayStr, symptoms: p.symptoms || {} });
+
+        // Tally
+        history.forEach(entry => {
+            const dayIndex = last7Days.indexOf(entry.date);
+            if (dayIndex !== -1 && entry.symptoms) {
+                // Check thresholds (assuming 0-10 scale or presence)
+                // If the user uses boolean/presence, ensure we check correctly.
+                // The snippet `renderModalSymptoms` handles standard values.
+                if (entry.symptoms['Pain'] > 0) symptomTrendData['Pain'][dayIndex]++;
+                if (entry.symptoms['Nausea'] > 0) symptomTrendData['Nausea'][dayIndex]++;
+                if (entry.symptoms['Dyspnea'] > 0) symptomTrendData['Dyspnea'][dayIndex]++;
+                if (entry.symptoms['Constipation'] > 0) symptomTrendData['Constipation'][dayIndex]++;
+            }
+        });
+    });
+
+    // 3. Render Charts
+    renderCharts(sortedDiag, last7Days, symptomTrendData, patients.length);
+}
+
+function renderCharts(diagnoses, labels, symptomData, totalPatients) {
+    // --- chart-census (Simulated History based on current count for demo, unless we store census history) ---
+    // Since we don't have a "Daily Census Log" in this frontend model, we'll show a "Static" view or simple distribution
+    // Let's repurpose this to "Patients by Ward" which is real data.
+    const wardCounts = {};
+    appData.sections.forEach(s => wardCounts[s.name] = 0);
+    appData.sections.forEach(s => {
+        if (appData.wards[s.name]) wardCounts[s.name] = appData.wards[s.name].length;
+    });
+    // Add unassigned
+    if (appData.wards['Unassigned']) wardCounts['Unassigned'] = appData.wards['Unassigned'].length;
+
+    renderCensusChart(wardCounts);
+    renderSymptomChart(labels, symptomData);
+    renderDiagnosisChart(diagnoses);
+}
+
+function renderCensusChart(wardCounts) {
+    const ctx = document.getElementById('chart-census').getContext('2d');
+    if (charts.census) charts.census.destroy();
+
+    charts.census = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(wardCounts),
+            datasets: [{
+                label: 'Active Patients',
+                data: Object.values(wardCounts),
+                backgroundColor: '#3b82f6',
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+        }
+    });
+}
+
+function renderSymptomChart(labels, data) {
+    const ctx = document.getElementById('chart-symptoms').getContext('2d');
+    if (charts.symptoms) charts.symptoms.destroy();
+
+    charts.symptoms = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels.map(d => d.slice(5)), // MM-DD
+            datasets: [
+                {
+                    label: 'Pain',
+                    data: data['Pain'],
+                    borderColor: '#ef4444',
+                    backgroundColor: '#ef4444',
+                    tension: 0.3
+                },
+                {
+                    label: 'Nausea',
+                    data: data['Nausea'],
+                    borderColor: '#f97316',
+                    backgroundColor: '#f97316',
+                    tension: 0.3
+                },
+                {
+                    label: 'Dyspnea',
+                    data: data['Dyspnea'],
+                    borderColor: '#3b82f6',
+                    backgroundColor: '#3b82f6',
+                    tension: 0.3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+        }
+    });
+}
+
+function renderDiagnosisChart(diagnoses) {
+    const ctx = document.getElementById('chart-diagnosis').getContext('2d');
+    if (charts.diagnosis) charts.diagnosis.destroy();
+
+    charts.diagnosis = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: diagnoses.map(d => d[0]),
+            datasets: [{
+                data: diagnoses.map(d => d[1]),
+                backgroundColor: [
+                    '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'right' }
+            }
+        }
+    });
+}

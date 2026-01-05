@@ -15,6 +15,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <style>
         /* Premium Glass Effect */
         .glass-panel {
@@ -569,6 +570,10 @@
                     class="w-full mt-2 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
                     <i class="fa-solid fa-folder-open mr-2"></i> Resources
                 </button>
+                <button onclick="openAnalyticsView()"
+                    class="w-full mt-2 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
+                    <i class="fa-solid fa-chart-line mr-2"></i> Analytics
+                </button>
             </div>
         </aside>
 
@@ -591,6 +596,76 @@
                 <!-- Cards injected via JS -->
             </div>
         </main>
+
+        <!-- Analytics View (Hidden by default) -->
+        <div id="analytics-view" class="hidden flex-1 flex flex-col bg-slate-50 overflow-hidden relative">
+            <!-- Header -->
+            <header
+                class="bg-white/80 backdrop-blur-md border-b border-slate-200 h-16 flex items-center justify-between px-6 z-20 sticky top-0">
+                <h1
+                    class="text-xl font-bold bg-gradient-to-r from-blue-700 to-indigo-600 bg-clip-text text-transparent">
+                    <i class="fa-solid fa-chart-line mr-2 text-indigo-600"></i> Unit Analytics
+                </h1>
+                <div class="flex gap-2">
+                    <button onclick="refreshAnalytics()"
+                        class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition-colors"
+                        title="Refresh Data">
+                        <i class="fa-solid fa-rotate-right"></i>
+                    </button>
+                    <button onclick="closeAnalyticsView()"
+                        class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition-colors"
+                        title="Close">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dashboard Content -->
+            <div class="flex-1 overflow-y-auto p-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl mx-auto">
+
+                    <!-- Census Chart -->
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                        <h3 class="font-bold text-slate-700 mb-4 flex items-center">
+                            <div
+                                class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mr-3">
+                                <i class="fa-solid fa-users"></i></div>
+                            Patient Census (Last 14 Days)
+                        </h3>
+                        <div class="h-64 relative">
+                            <canvas id="chart-census"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Symptom Trends Chart -->
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                        <h3 class="font-bold text-slate-700 mb-4 flex items-center">
+                            <div
+                                class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center mr-3">
+                                <i class="fa-solid fa-heart-pulse"></i></div>
+                            Symptom Prevalence (Active Patients)
+                        </h3>
+                        <div class="h-64 relative">
+                            <canvas id="chart-symptoms"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Diagnosis Distribution -->
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 lg:col-span-2">
+                        <h3 class="font-bold text-slate-700 mb-4 flex items-center">
+                            <div
+                                class="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center mr-3">
+                                <i class="fa-solid fa-clipboard-user"></i></div>
+                            Active Diagnosis Distribution
+                        </h3>
+                        <div class="h-64 relative">
+                            <canvas id="chart-diagnosis"></canvas>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Floating Action Bar (Bulk Actions) -->
