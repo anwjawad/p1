@@ -744,9 +744,25 @@
                     </div>
                 </section>
 
+                <!-- Active Plan Display Section -->
+                <section id="modal-plan-section" class="hidden">
+                    <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wide mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-violet-600"></i> Active Plan
+                    </h3>
+                    <div id="modal-plan-list" class="space-y-2">
+                        <!-- Plan items rendered here -->
+                    </div>
+                </section>
+
                 <!-- Treatment -->
                 <section>
-                    <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wide mb-3">Current Treatment</h3>
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wide">Current Treatment</h3>
+                        <button onclick="openPlanModal(appData.currentPatient)"
+                            class="bg-violet-600 text-white px-3 py-1 rounded-lg text-xs font-bold hover:bg-violet-700 transition-colors shadow-sm flex items-center gap-2">
+                            <i class="fa-solid fa-list-check"></i> Manage Plan
+                        </button>
+                    </div>
                     <textarea id="inp-treatment" rows="3"
                         class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 resize-none focus:ring-2 focus:ring-medical-500 focus:outline-none"></textarea>
                 </section>
