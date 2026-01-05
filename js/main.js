@@ -2752,36 +2752,23 @@ function quickAddStandardSections() {
         { name: 'Treatment Room', color: 'slate', icon: 'bed-pulse' }
     ];
 
-    let changed = false;
+    // OPTION 2: Nuclear approach to force repair
+    // Remove existing "standard" definitions to ensure clean slate
+    const standardNames = standards.map(s => s.name);
+    appData.sections = appData.sections.filter(s => !standardNames.includes(s.name));
+
+    // Re-add all standards as fresh persistent sections
     standards.forEach(s => {
-        const existing = appData.sections.find(ex => ex.name === s.name);
-        if (existing) {
-            // If it exists but wasn't persistent (hidden because empty), make it persistent
-            if (!existing.isPersistent) {
-                existing.isPersistent = true;
-                existing.color = s.color; // Reset color to standard
-                existing.icon = s.icon;   // Reset icon to standard
-                if (!appData.wards[s.name]) appData.wards[s.name] = [];
-                changed = true;
-            }
-        } else {
-            // New Section
-            appData.sections.push({
-                name: s.name,
-                color: s.color,
-                icon: s.icon,
-                isPersistent: true
-            });
-            if (!appData.wards[s.name]) appData.wards[s.name] = [];
-            changed = true;
-        }
+        appData.sections.push({
+            name: s.name,
+            color: s.color,
+            icon: s.icon,
+            isPersistent: true
+        });
+        if (!appData.wards[s.name]) appData.wards[s.name] = [];
     });
 
-    if (changed) {
-        saveMetadata();
-        renderWardsSidebar();
-        alert("Standard sections added/restored!");
-    } else {
-        alert("Standard sections are already added.");
-    }
+    saveMetadata();
+    renderWardsSidebar();
+    alert("Standard sections forced reset and added!");
 }
