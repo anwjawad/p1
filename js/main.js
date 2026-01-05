@@ -7,6 +7,10 @@ const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxJ0bG4MEptJCL_4057
 let appData = {
     patients: [],
     wards: {},
+    sections: [], // Persistent Sections Metadata
+    selectionMode: false,
+    selectedPatientIds: new Set(),
+
     // Hardcoded ranges since they are static
     ranges: {
         'Cl': [98, 107],          // Chloride
