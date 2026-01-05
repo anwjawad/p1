@@ -2742,3 +2742,35 @@ function savePlanChanges() {
     triggerSave(); // Local timer save
     if (GasApiAvailable()) syncBatchUpdate(updates);
 }
+
+function quickAddStandardSections() {
+    const standards = [
+        { name: 'Medical', color: 'blue', icon: 'stethoscope' },
+        { name: 'Surgical', color: 'green', icon: 'scalpel' },
+        { name: 'Hematology', color: 'purple', icon: 'flask' },
+        { name: 'ICU', color: 'orange', icon: 'heart-pulse' },
+        { name: 'Treatment Room', color: 'slate', icon: 'bed-pulse' }
+    ];
+
+    let changed = false;
+    standards.forEach(s => {
+        if (!appData.sections.find(existing => existing.name === s.name)) {
+            appData.sections.push({
+                name: s.name,
+                color: s.color,
+                icon: s.icon,
+                isPersistent: true
+            });
+            // Init empty array in wards map
+            if (!appData.wards[s.name]) appData.wards[s.name] = [];
+            changed = true;
+        }
+    });
+
+    if (changed) {
+        saveMetadata();
+        renderWardsSidebar();
+    } else {
+        alert("Standard sections are already added.");
+    }
+}
