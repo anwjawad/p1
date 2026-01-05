@@ -2,7 +2,8 @@
 // --------------------------------------------------------
 // CONFIGURATION
 // --------------------------------------------------------
-const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxJ0bG4MEptJCL_4057PM1UkFXrVSp5Vyydrq4ZvAUzGt3-gqyGq4aV1UhRpi90tszK/exec";
+// Use var to prevent "already declared" errors if script is double-loaded
+var GAS_API_URL = "https://script.google.com/macros/s/AKfycbxJ0bG4MEptJCL_4057PM1UkFXrVSp5Vyydrq4ZvAUzGt3-gqyGq4aV1UhRpi90tszK/exec";
 
 let appData = {
     patients: [],
@@ -1258,24 +1259,28 @@ function triggerSave() {
     status.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-blue-500 mr-1"></i> Saving...';
 
     if (appData.currentPatient) {
-        // Read Header Fields
-        appData.currentPatient.name = document.getElementById('modal-patient-name').value;
-        appData.currentPatient.code = document.getElementById('modal-patient-code').value;
-        appData.currentPatient.age = document.getElementById('modal-patient-age').value;
-        appData.currentPatient.room = document.getElementById('modal-patient-room').value;
+        // Only scrape DOM if the Patient Modal is actually open
+        const modal = document.getElementById('patient-modal');
+        if (modal && !modal.classList.contains('hidden')) {
+            // Read Header Fields
+            appData.currentPatient.name = document.getElementById('modal-patient-name').value || appData.currentPatient.name;
+            appData.currentPatient.code = document.getElementById('modal-patient-code').value || appData.currentPatient.code;
+            appData.currentPatient.age = document.getElementById('modal-patient-age').value || appData.currentPatient.age;
+            appData.currentPatient.room = document.getElementById('modal-patient-room').value || appData.currentPatient.room;
 
-        appData.currentPatient.diagnosis = document.getElementById('inp-diagnosis').value;
-        appData.currentPatient.provider = document.getElementById('inp-provider').value;
-        appData.currentPatient.treatment = document.getElementById('inp-treatment').value;
+            appData.currentPatient.diagnosis = document.getElementById('inp-diagnosis').value || appData.currentPatient.diagnosis;
+            appData.currentPatient.provider = document.getElementById('inp-provider').value || appData.currentPatient.provider;
+            appData.currentPatient.treatment = document.getElementById('inp-treatment').value || appData.currentPatient.treatment;
 
-        // Save Medications as JSON
-        const medsObj = {
-            regular: document.getElementById('inp-medications-regular').value,
-            prn: document.getElementById('inp-medications-prn').value
-        };
-        appData.currentPatient.medications = JSON.stringify(medsObj);
+            // Save Medications as JSON
+            const medsObj = {
+                regular: document.getElementById('inp-medications-regular').value,
+                prn: document.getElementById('inp-medications-prn').value
+            };
+            appData.currentPatient.medications = JSON.stringify(medsObj);
 
-        appData.currentPatient.notes = document.getElementById('inp-notes').value;
+            appData.currentPatient.notes = document.getElementById('inp-notes').value || appData.currentPatient.notes;
+        }
     }
 
     if (saveTimer) clearTimeout(saveTimer);
