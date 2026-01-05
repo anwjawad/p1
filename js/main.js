@@ -1331,6 +1331,7 @@ function openImportModal() {
     document.getElementById('import-step-1').classList.remove('hidden');
     document.getElementById('import-step-2').classList.add('hidden');
     document.getElementById('import-step-3').classList.add('hidden');
+    document.getElementById('import-footer').classList.remove('hidden'); // Reset footer visibility
     document.getElementById('btn-start-import').disabled = true;
     document.getElementById('btn-start-import').classList.add('cursor-not-allowed', 'bg-slate-300');
     document.getElementById('btn-start-import').classList.remove('bg-medical-600', 'hover:bg-medical-700');

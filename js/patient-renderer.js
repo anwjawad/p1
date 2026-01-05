@@ -113,7 +113,7 @@ function renderPatientsGrid(patients) {
         // --- Plan Text Preview (UPDATED: Text List) ---
         let planPreviewHTML = '';
         if (p.plan && Array.isArray(p.plan) && p.plan.length > 0) {
-            planPreviewHTML = `<div class="mt-3 pt-2 border-t border-slate-50 space-y-1">`;
+            planPreviewHTML = `<div class="mt-3 pt-2 border-t border-slate-50 grid grid-cols-3 gap-1">`;
             p.plan.forEach(item => {
                 let colorClass = 'text-slate-600';
                 let icon = 'circle';
@@ -182,7 +182,7 @@ function renderPatientsGrid(patients) {
             <!-- Footer Buttons -->
             <div class="flex items-center gap-2 mt-3 pt-3 border-t border-slate-50 justify-between">
                 <div class="flex items-center gap-2">
-                    <span class="text-xs text-slate-500 font-medium truncate max-w-[120px]" title="${p.provider || 'Unassigned'}">
+                    <span class="text-xs text-slate-500 font-medium" title="${p.provider || 'Unassigned'}">
                         <i class="fa-solid fa-user-doctor mr-1"></i> ${p.provider || 'Unassigned'}
                     </span>
                 </div>
