@@ -3,6 +3,7 @@
  */
 
 var SHEET_NAME = 'Patients';
+var METADATA_SHEET_NAME = 'Metadata'; // New Sheet for Settings/Sections
 var LOCK_WAIT_MS = 10000;
 var GEMINI_API_KEY = 'AIzaSyDyxZSczhZoJ7OnIJxwV053VnFSzG2j6MY'; 
 
@@ -39,7 +40,8 @@ function doGet(e) {
   if (lock.tryLock(LOCK_WAIT_MS)) {
     try {
       var data = getAllPatients();
-      return corsJsonResponse(data);
+      var metadata = getMetadata(); // Fetch options/sections too
+      return corsJsonResponse({ patients: data, metadata: metadata });
     } catch (err) {
       return corsJsonResponse({ error: err.toString() });
     } finally {
@@ -85,6 +87,9 @@ function doPost(e) {
            break;
         case 'get_files':
            result = handleGetDriveFiles(data.folderId);
+           break;
+        case 'save_metadata':
+           result = handleSaveMetadata(data.metadata);
            break;
         default:
           // Single Update
@@ -309,6 +314,63 @@ function handleGetDriveFiles(folderId) {
   }
 }
 
+// --- Metadata Handlers ---
+
+function getMetadata() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(METADATA_SHEET_NAME);
+  if (!sheet) return {}; 
+  
+  var data = sheet.getDataRange().getValues();
+  // Simple Key-Value Store implementation
+  // Row 1 = Key, Row 2 = Value (JSON encoded)
+  var output = {};
+  if (data.length < 2) return {};
+  
+  var keys = data[0];
+  var values = data[1];
+  
+  keys.forEach(function(k, i) {
+    if (k && values[i]) {
+       try {
+         output[k] = JSON.parse(values[i]);
+       } catch (e) {
+         output[k] = values[i];
+       }
+    }
+  });
+  
+  return output;
+}
+
+function handleSaveMetadata(newMeta) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(METADATA_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(METADATA_SHEET_NAME);
+  }
+  
+  // Get existing
+  var existing = getMetadata();
+  var merged = Object.assign({}, existing, newMeta);
+  
+  // Write back (Simple: overwrite row 1 & 2)
+  var keys = Object.keys(merged);
+  var values = keys.map(function(k) { 
+     var v = merged[k];
+     return (typeof v === 'object') ? JSON.stringify(v) : v;
+  });
+  
+  sheet.clear();
+  if (keys.length > 0) {
+    sheet.getRange(1, 1, 1, keys.length).setValues([keys]);
+    sheet.getRange(2, 1, 1, values.length).setValues([values]);
+  }
+  
+  return { status: 'success' };
+}
+
+
 
 // --- Standard Handlers (No Changes) ---
 function handleImport(patients) {
@@ -450,7 +512,8 @@ function ensureHeaders(sheet) {
   var required = [
     'id', 'name', 'code', 'ward', 'room', 'age', 
     'diagnosis', 'provider', 'treatment', 'medications', 
-    'notes', 'symptoms', 'labs', 'history_symptoms', 'history_labs', 'last_updated'
+    'notes', 'symptoms', 'labs', 'history_symptoms', 
+    'history_labs', 'last_updated', 'plan', 'is_highlighted'
   ];
   
   var lastCol = sheet.getLastColumn();

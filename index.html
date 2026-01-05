@@ -499,6 +499,11 @@
                     class="text-xs font-normal text-slate-500 ml-2 hidden sm:inline">v1.1</span></h1>
         </div>
         <div class="flex items-center gap-4">
+            <button id="btn-select-mode" onclick="toggleSelectionMode()"
+                class="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm font-bold shadow-sm hover:shadow-md transition-all active:scale-95">
+                <i class="fa-solid fa-check-double mr-2"></i> Select
+            </button>
+            <div class="h-6 w-px bg-slate-200 mx-1"></div>
             <button onclick="openCalculatorModal()" class="p-2 text-slate-400 hover:text-medical-600 transition-colors"
                 title="Opioid Calculator"><i class="fa-solid fa-calculator"></i></button>
             <button onclick="openSettingsModal()" class="p-2 text-slate-400 hover:text-medical-600 transition-colors"
@@ -582,7 +587,84 @@
         </main>
     </div>
 
-    <!-- Patient Details Modal -->
+    <!-- Floating Action Bar (Bulk Actions) -->
+    <div id="floating-action-bar"
+        class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-6 z-40 transform translate-y-24 transition-transform duration-300">
+        <span class="font-bold text-sm"><span id="selected-count"
+                class="bg-white text-slate-900 px-2 py-0.5 rounded-full text-xs mr-2">0</span> Selected</span>
+        <div class="h-4 w-px bg-slate-600"></div>
+        <button onclick="executeBulkMove()" class="flex items-center gap-2 hover:text-medical-300 transition-colors">
+            <i class="fa-solid fa-right-to-bracket"></i> Move
+        </button>
+        <button onclick="executeBulkDelete()" class="flex items-center gap-2 hover:text-red-300 transition-colors">
+            <i class="fa-solid fa-trash"></i> Delete
+        </button>
+    </div>
+
+    <!-- Section/Ward Creator Modal -->
+    <div id="section-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center">
+        <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="closeSectionModal()"></div>
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative z-10 animate-entry">
+            <h3 class="text-xl font-bold text-slate-800 mb-4">Create New Section</h3>
+
+            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Section Name</label>
+            <input type="text" id="new-section-name"
+                class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl mb-4 focus:ring-2 focus:ring-medical-500 outline-none"
+                placeholder="e.g. ICU, Surgical Ward A">
+
+            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Color Theme</label>
+            <div class="flex gap-2 mb-4">
+                <button onclick="selectSectionColor('slate')"
+                    class="w-8 h-8 rounded-full bg-slate-400 ring-2 ring-offset-2 ring-slate-400 section-color-btn"
+                    data-color="slate"></button>
+                <button onclick="selectSectionColor('blue')"
+                    class="w-8 h-8 rounded-full bg-blue-400 bg-opacity-50 ring-offset-2 section-color-btn"
+                    data-color="blue"></button>
+                <button onclick="selectSectionColor('red')"
+                    class="w-8 h-8 rounded-full bg-red-400 bg-opacity-50 ring-offset-2 section-color-btn"
+                    data-color="red"></button>
+                <button onclick="selectSectionColor('green')"
+                    class="w-8 h-8 rounded-full bg-emerald-400 bg-opacity-50 ring-offset-2 section-color-btn"
+                    data-color="green"></button>
+                <button onclick="selectSectionColor('purple')"
+                    class="w-8 h-8 rounded-full bg-violet-400 bg-opacity-50 ring-offset-2 section-color-btn"
+                    data-color="purple"></button>
+                <button onclick="selectSectionColor('orange')"
+                    class="w-8 h-8 rounded-full bg-orange-400 bg-opacity-50 ring-offset-2 section-color-btn"
+                    data-color="orange"></button>
+            </div>
+
+            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Icon</label>
+            <div class="grid grid-cols-5 gap-2 mb-6">
+                <button onclick="selectSectionIcon('hospital')"
+                    class="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 section-icon-btn ring-2 ring-slate-400"
+                    data-icon="hospital"><i class="fa-solid fa-hospital"></i></button>
+                <button onclick="selectSectionIcon('bed-pulse')"
+                    class="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 section-icon-btn"
+                    data-icon="bed-pulse"><i class="fa-solid fa-bed-pulse"></i></button>
+                <button onclick="selectSectionIcon('heart-pulse')"
+                    class="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 section-icon-btn"
+                    data-icon="heart-pulse"><i class="fa-solid fa-heart-pulse"></i></button>
+                <button onclick="selectSectionIcon('syringe')"
+                    class="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 section-icon-btn"
+                    data-icon="syringe"><i class="fa-solid fa-syringe"></i></button>
+                <button onclick="selectSectionIcon('user-doctor')"
+                    class="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 section-icon-btn"
+                    data-icon="user-doctor"><i class="fa-solid fa-user-doctor"></i></button>
+            </div>
+
+            <div class="flex justify-end gap-3">
+                <button onclick="closeSectionModal()"
+                    class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg">Cancel</button>
+                <button onclick="confirmAddSection()"
+                    class="px-6 py-2 bg-slate-800 text-white rounded-lg font-bold hover:bg-slate-700">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Add Sections Helper (Hidden by default, triggered by special button) -->
+    <!-- Plan Modal -->
+
     <div id="patient-modal" class="fixed inset-0 z-50 hidden">
         <!-- Backdrop -->
         <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onclick="closeModal()"></div>
@@ -1367,6 +1449,162 @@
     </div>
 
     <script src="js/main.js?v=4"></script>
+    <!-- Plan Action Sheet/Modal -->
+    <div id="plan-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closePlanModal()"></div>
+        <div
+            class="bg-slate-50 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden relative z-10 animate-entry max-h-[85vh] flex flex-col">
+
+            <!-- Header -->
+            <div class="px-6 py-4 bg-white border-b border-slate-200 flex justify-between items-center">
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800">Add to Care Plan</h3>
+                    <p class="text-sm text-slate-500">Select an intervention type</p>
+                </div>
+                <button onclick="closePlanModal()"
+                    class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"><i
+                        class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="p-6 overflow-y-auto" id="plan-content-area">
+                <!-- GRID OF OPTIONS -->
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4" id="plan-options-grid">
+                    <button onclick="showPlanDetail('medication')"
+                        class="flex flex-col items-center justify-center p-6 bg-white border border-slate-200 rounded-xl hover:border-indigo-500 hover:shadow-lg transition-all group">
+                        <div
+                            class="w-12 h-12 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center text-xl mb-3 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+                            <i class="fa-solid fa-pills"></i>
+                        </div>
+                        <span class="font-bold text-slate-700">Medication</span>
+                    </button>
+
+                    <button onclick="showPlanDetail('equipment')"
+                        class="flex flex-col items-center justify-center p-6 bg-white border border-slate-200 rounded-xl hover:border-cyan-500 hover:shadow-lg transition-all group">
+                        <div
+                            class="w-12 h-12 rounded-full bg-cyan-50 text-cyan-500 flex items-center justify-center text-xl mb-3 group-hover:bg-cyan-500 group-hover:text-white transition-colors">
+                            <i class="fa-solid fa-mask-ventilator"></i>
+                        </div>
+                        <span class="font-bold text-slate-700">Equipment</span>
+                    </button>
+
+                    <button onclick="showPlanDetail('consult_physio')"
+                        class="flex flex-col items-center justify-center p-6 bg-white border border-slate-200 rounded-xl hover:border-emerald-500 hover:shadow-lg transition-all group">
+                        <div
+                            class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center text-xl mb-3 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                            <i class="fa-solid fa-person-walking"></i>
+                        </div>
+                        <span class="font-bold text-slate-700">Physiotherapy</span>
+                    </button>
+
+                    <button onclick="showPlanDetail('consult_psych')"
+                        class="flex flex-col items-center justify-center p-6 bg-white border border-slate-200 rounded-xl hover:border-rose-500 hover:shadow-lg transition-all group">
+                        <div
+                            class="w-12 h-12 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center text-xl mb-3 group-hover:bg-rose-500 group-hover:text-white transition-colors">
+                            <i class="fa-solid fa-brain"></i>
+                        </div>
+                        <span class="font-bold text-slate-700">Psychosocial</span>
+                    </button>
+
+                    <button onclick="showPlanDetail('consult_nutrition')"
+                        class="flex flex-col items-center justify-center p-6 bg-white border border-slate-200 rounded-xl hover:border-orange-500 hover:shadow-lg transition-all group">
+                        <div
+                            class="w-12 h-12 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center text-xl mb-3 group-hover:bg-orange-500 group-hover:text-white transition-colors">
+                            <i class="fa-solid fa-carrot"></i>
+                        </div>
+                        <span class="font-bold text-slate-700">Nutrition</span>
+                    </button>
+
+                    <button onclick="showPlanDetail('note')"
+                        class="flex flex-col items-center justify-center p-6 bg-white border border-slate-200 rounded-xl hover:border-slate-500 hover:shadow-lg transition-all group">
+                        <div
+                            class="w-12 h-12 rounded-full bg-slate-50 text-slate-500 flex items-center justify-center text-xl mb-3 group-hover:bg-slate-500 group-hover:text-white transition-colors">
+                            <i class="fa-solid fa-note-sticky"></i>
+                        </div>
+                        <span class="font-bold text-slate-700">Note / Other</span>
+                    </button>
+                </div>
+
+                <!-- SUB-VIEWS (Hidden by default) -->
+
+                <!-- Medication Sub-View -->
+                <div id="plan-sub-medication" class="hidden animate-entry">
+                    <button onclick="resetPlanView()"
+                        class="mb-4 text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center"><i
+                            class="fa-solid fa-arrow-left mr-1"></i> Back</button>
+
+                    <h4 class="font-bold text-lg text-indigo-900 mb-4">Medication Action</h4>
+
+                    <div class="grid grid-cols-2 gap-3 mb-6">
+                        <button onclick="selectMedAction('Add New')"
+                            class="p-3 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 hover:bg-indigo-50 hover:border-indigo-200">Add
+                            New</button>
+                        <button onclick="selectMedAction('Opioid Escalation')"
+                            class="p-3 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 hover:bg-indigo-50 hover:border-indigo-200">Opioid
+                            Escalation</button>
+                        <button onclick="selectMedAction('Opioid De-escalation')"
+                            class="p-3 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 hover:bg-indigo-50 hover:border-indigo-200">De-escalation</button>
+                        <button onclick="selectMedAction('Opioid Rotation')"
+                            class="p-3 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 hover:bg-indigo-50 hover:border-indigo-200">Opioid
+                            Rotation</button>
+                        <button onclick="selectMedAction('Modification')"
+                            class="p-3 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 hover:bg-indigo-50 hover:border-indigo-200">Modification</button>
+                    </div>
+
+                    <div id="med-input-area" class="hidden">
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Medication Details</label>
+                        <textarea id="plan-med-details"
+                            class="w-full p-3 bg-white border border-slate-200 rounded-xl mb-4 focus:ring-2 focus:ring-indigo-500 outline-none"
+                            rows="3" placeholder="e.g. Morphine 5mg SC Q4H PRN..."></textarea>
+                        <button onclick="savePlanItem('medication')"
+                            class="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200">Save
+                            to Plan</button>
+                    </div>
+                </div>
+
+                <!-- Equipment Sub-View -->
+                <div id="plan-sub-equipment" class="hidden animate-entry">
+                    <button onclick="resetPlanView()"
+                        class="mb-4 text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center"><i
+                            class="fa-solid fa-arrow-left mr-1"></i> Back</button>
+                    <h4 class="font-bold text-lg text-cyan-900 mb-4">Select Equipment</h4>
+
+                    <div class="space-y-2">
+                        <button onclick="saveQuickPlan('equipment', 'O2 Generator')"
+                            class="w-full p-3 text-left bg-white border border-slate-200 rounded-lg font-medium hover:bg-cyan-50 hover:border-cyan-200">O2
+                            Generator</button>
+                        <button onclick="saveQuickPlan('equipment', 'Air Mattress')"
+                            class="w-full p-3 text-left bg-white border border-slate-200 rounded-lg font-medium hover:bg-cyan-50 hover:border-cyan-200">Air
+                            Mattress</button>
+                        <button onclick="saveQuickPlan('equipment', 'Suction Machine')"
+                            class="w-full p-3 text-left bg-white border border-slate-200 rounded-lg font-medium hover:bg-cyan-50 hover:border-cyan-200">Suction
+                            Machine</button>
+                        <button onclick="saveQuickPlan('equipment', 'Nebulizer')"
+                            class="w-full p-3 text-left bg-white border border-slate-200 rounded-lg font-medium hover:bg-cyan-50 hover:border-cyan-200">Nebulizer</button>
+                        <button onclick="saveQuickPlan('equipment', 'LDD')"
+                            class="w-full p-3 text-left bg-white border border-slate-200 rounded-lg font-medium hover:bg-cyan-50 hover:border-cyan-200">LDD
+                            (Syringe Driver)</button>
+                    </div>
+                </div>
+
+                <!-- Generic Note Sub-View -->
+                <div id="plan-sub-note" class="hidden animate-entry">
+                    <button onclick="resetPlanView()"
+                        class="mb-4 text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center"><i
+                            class="fa-solid fa-arrow-left mr-1"></i> Back</button>
+                    <h4 class="font-bold text-lg text-slate-800 mb-4" id="plan-note-title">Add Note</h4>
+
+                    <textarea id="plan-note-text"
+                        class="w-full p-4 bg-white border border-slate-200 rounded-xl mb-4 focus:ring-2 focus:ring-slate-500 outline-none"
+                        rows="4" placeholder="Type your plan/consult details here..."></textarea>
+
+                    <button onclick="savePlanItem('note')"
+                        class="w-full py-3 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-700 shadow-lg">Save
+                        to Plan</button>
+                </div>
+
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>
