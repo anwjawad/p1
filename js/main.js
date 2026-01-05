@@ -2831,38 +2831,31 @@ async function generateUnitAnalytics() {
     try {
         const res = await fetch(GAS_API_URL, {
             method: 'POST',
-            const res = await fetch(GAS_API_URL, {
-                method: 'POST',
-                mode: 'cors', // Changed to CORS to receive data 
-                // We MUST use redirect/jsonp or just assume CORS is set up correctly in GAS.
-                // Wait, previous fetches in this app use 'no-cors' for fire-and-forget, but for GETTING data we need normal CORS.
-                // GAS doGet handles CORS correctly via ContentService.
-                // But here we are using POST.
-                // Let's rely on standard fetch. If User hasn't deployed as 'Any User', this will fail.
-                redirect: 'follow',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'get_analytics' })
-            });
+            mode: 'cors',
+            redirect: 'follow',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'get_analytics' })
+        });
 
-            // Handling GAS CORS quirk:
-            // Regular POST to /exec often issues 302 redirect. 'follow' handles it, but requires 'text/plain' to avoid preflight options failure if not handled.
-            // My GAS Code.gs HAS doOptions, so application/json MIGHT work, but text/plain is safer for GAS.
+        // Handling GAS CORS quirk:
+        // Regular POST to /exec often issues 302 redirect. 'follow' handles it, but requires 'text/plain' to avoid preflight options failure if not handled.
+        // My GAS Code.gs HAS doOptions, so application/json MIGHT work, but text/plain is safer for GAS.
 
-            const json = await res.json();
+        const json = await res.json();
 
-            if(json.status === 'success') {
-                renderCharts(sortedDiag, json.dates, json.symptoms, json.census);
-    } else {
-        console.error("Analytics Error", json);
-        alert("Failed to load analytics: " + (json.error || "Unknown error"));
+        if (json.status === 'success') {
+            renderCharts(sortedDiag, json.dates, json.symptoms, json.census);
+        } else {
+            console.error("Analytics Error", json);
+            alert("Failed to load analytics: " + (json.error || "Unknown error"));
+        }
+
+    } catch (e) {
+        console.error("Fetch Analytics Failed", e);
+        // Fallback or Alert?
+        // alert("Could not fetch history. Showing active data only.");
+        // renderCharts(sortedDiag, [], {}, 0);
     }
-
-} catch (e) {
-    console.error("Fetch Analytics Failed", e);
-    // Fallback or Alert?
-    // alert("Could not fetch history. Showing active data only.");
-    // renderCharts(sortedDiag, [], {}, 0);
-}
 }
 
 function renderCharts(diagnoses, dates, symptomData, censusData) {
