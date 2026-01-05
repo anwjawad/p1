@@ -5,7 +5,7 @@
 // Use var to prevent "already declared" errors if script is double-loaded
 var GAS_API_URL = "https://script.google.com/macros/s/AKfycbxJ0bG4MEptJCL_4057PM1UkFXrVSp5Vyydrq4ZvAUzGt3-gqyGq4aV1UhRpi90tszK/exec";
 
-let appData = {
+var appData = {
     patients: [],
     wards: {},
     sections: [], // Persistent Sections Metadata
@@ -166,6 +166,14 @@ async function fetchData() {
             alert("Error from Sheet: " + json.error);
             return;
         }
+
+        // Parse complex fields (Plans)
+        patients.forEach(p => {
+            if (p.plan && typeof p.plan === 'string') {
+                try { p.plan = JSON.parse(p.plan); } catch (e) { p.plan = []; }
+            }
+            if (!Array.isArray(p.plan)) p.plan = [];
+        });
 
         appData.patients = patients;
 
@@ -2667,7 +2675,9 @@ function selectMedAction(action) {
 }
 
 function savePlanItem(category) {
-    if (!appData.currentPatient.plan) appData.currentPatient.plan = [];
+    if (!appData.currentPatient.plan || !Array.isArray(appData.currentPatient.plan)) {
+        appData.currentPatient.plan = [];
+    }
 
     let newItem = null;
 
