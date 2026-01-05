@@ -129,7 +129,7 @@ function toggleSidebar() {
 }
 
 // Auto-save timer
-let saveTimer = null;
+var saveTimer = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     if (GAS_API_URL.includes("Paste_Your")) {
@@ -526,10 +526,7 @@ function selectWard(wardName) {
     renderPatientsGrid(patients);
 }
 
-/* 
-   renderPatientsGrid has been moved to js/patient-renderer.js 
-   to handle complex UI updates separately. 
-*/
+
 
 function toggleHighlight(e, id) {
     e.stopPropagation();
@@ -2518,7 +2515,7 @@ function renderResources(files) {
 
 // --- Section/Ward Customization Modal Logic ---
 
-let sectionModalState = { color: 'slate', icon: 'hospital' };
+var sectionModalState = { color: 'slate', icon: 'hospital' };
 
 function addNewWard() {
     // Override standard prompt with Modal
@@ -2667,7 +2664,7 @@ function showPlanDetail(type) {
 }
 
 // Medication Flow
-let currentMedAction = '';
+var currentMedAction = '';
 function selectMedAction(action) {
     currentMedAction = action;
     document.getElementById('med-input-area').classList.remove('hidden');
