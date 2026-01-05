@@ -2874,7 +2874,10 @@ function savePlanItem(category) {
 }
 
 function saveQuickPlan(type, value) {
-    if (!appData.currentPatient.plan) appData.currentPatient.plan = [];
+    // Ensure initialized
+    if (!appData.currentPatient.plan || !Array.isArray(appData.currentPatient.plan)) {
+        appData.currentPatient.plan = [];
+    }
 
     const newItem = {
         id: Date.now(),
