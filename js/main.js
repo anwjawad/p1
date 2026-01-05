@@ -150,22 +150,46 @@ async function fetchData() {
     try {
         document.getElementById('patient-count').innerText = "...";
         const res = await fetch(GAS_API_URL);
-        const patients = await res.json();
+        const json = await res.json();
 
-        if (patients.error) {
-            alert("Error from Sheet: " + patients.error);
+        let patients = [];
+        let metadata = {};
+
+        // Handle V1 and V2 responses (V2 has {patients, metadata})
+        if (Array.isArray(json)) {
+            patients = json;
+        } else if (json.patients) {
+            patients = json.patients;
+            metadata = json.metadata || {};
+        } else if (json.error) {
+            alert("Error from Sheet: " + json.error);
             return;
         }
 
         appData.patients = patients;
 
-        // Group by Ward
-        appData.wards = {};
-        patients.forEach(p => {
-            const w = p.ward || 'Unassigned';
-            if (!appData.wards[w]) appData.wards[w] = [];
-            appData.wards[w].push(p);
-        });
+        // Load Sections from Metadata
+        if (metadata.sections) {
+            try {
+                appData.sections = typeof metadata.sections === 'string' ? JSON.parse(metadata.sections) : metadata.sections;
+            } catch (e) {
+                console.warn("Failed to parse sections metadata", e);
+                appData.sections = [];
+            }
+        } else {
+            // Recover sections from existing patient wards if no metadata
+            const rawWards = [...new Set(patients.map(p => p.ward))].filter(w => w);
+            appData.sections = rawWards.map(w => ({
+                id: w,
+                name: w,
+                color: 'slate',
+                icon: 'hospital',
+                isPersistent: false // Auto-discovered
+            }));
+        }
+
+        // Group by Ward (Compute derived state)
+        rebuildWardsMap();
 
         renderWardsSidebar();
 
@@ -180,6 +204,55 @@ async function fetchData() {
 
     } catch (e) {
         console.error("Failed to load data", e);
+        document.getElementById('patient-count').innerText = "Err";
+    }
+}
+
+function rebuildWardsMap() {
+    appData.wards = {};
+
+    // 1. Initialize empty arrays for all Persistent Sections
+    appData.sections.forEach(s => {
+        appData.wards[s.name] = [];
+    });
+
+    // 2. Distribute Patients
+    if (Array.isArray(appData.patients)) {
+        appData.patients.forEach(p => {
+            // Basic Normalization
+            if (!p.ward) p.ward = "Unassigned";
+
+            // If ward doesn't exist in sections (e.g. new from sheet), create ad-hoc section? 
+            // Or just add to wards map logic.
+            // We choose: Add to wards map.
+            if (!appData.wards[p.ward]) {
+                appData.wards[p.ward] = [];
+                // Should we auto-add to sections? Yes, for display consistency
+                if (!appData.sections.find(s => s.name === p.ward)) {
+                    appData.sections.push({ name: p.ward, color: 'slate', icon: 'hospital', isPersistent: false });
+                }
+            }
+            appData.wards[p.ward].push(p);
+        });
+    }
+}
+
+function saveMetadata() {
+    // Save sections state to backend
+    // We can piggyback on a patient update or simpler: send special action
+    if (GasApiAvailable()) {
+        const payload = {
+            action: 'save_metadata',
+            metadata: {
+                sections: JSON.stringify(appData.sections)
+            }
+        };
+        fetch(GAS_API_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // Avoid Options
+            body: JSON.stringify(payload)
+        }).catch(e => console.error("Metadata save failed", e));
     }
 }
 
@@ -187,75 +260,86 @@ function renderWardsSidebar() {
     const list = document.getElementById('wards-list');
     list.innerHTML = '';
 
-    Object.keys(appData.wards).forEach(ward => {
-        const count = appData.wards[ward].length;
+    appData.sections.forEach(section => {
+        const wardName = section.name;
+        const patients = appData.wards[wardName] || [];
+        const count = patients.length;
+
+        // Skip empty NON-persistent wards (clean up)
+        if (!section.isPersistent && count === 0) return;
+
         const btn = document.createElement('div');
-        btn.className = `p-3 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors flex justify-between items-center group ward-item relative overflow-hidden`;
+        const isActive = appData.currentWard === wardName;
+
+        // Styling based on color
+        const colorMap = {
+            'slate': 'bg-slate-200 text-slate-700 group-hover:bg-slate-300',
+            'blue': 'bg-blue-100 text-blue-600 group-hover:bg-blue-200',
+            'red': 'bg-red-100 text-red-600 group-hover:bg-red-200',
+            'green': 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-200',
+            'purple': 'bg-violet-100 text-violet-600 group-hover:bg-violet-200',
+            'orange': 'bg-orange-100 text-orange-600 group-hover:bg-orange-200'
+        };
+        const iconColorClass = colorMap[section.color] || colorMap['slate'];
+        const activeClass = isActive ? 'bg-white shadow-md ring-1 ring-slate-200' : 'hover:bg-slate-50';
+
+        btn.className = `p-3 rounded-lg cursor-pointer transition-all flex justify-between items-center group ward-item relative overflow-hidden mb-2 ${activeClass}`;
         btn.onclick = (e) => {
-            // Check if delete button was clicked
             if (e.target.closest('.delete-ward-btn')) return;
-            selectWard(ward);
+            selectWard(wardName);
         }
 
         btn.innerHTML = `
             <div class="flex items-center gap-3">
-                <div class="w-2 h-8 bg-slate-200 rounded-full group-hover:bg-medical-400 transition-colors" id="ward-indicator-${ward.replace(/\s/g, '')}"></div>
-                <span class="font-medium text-slate-700 group-hover:text-medical-700">${ward}</span>
+                <div class="w-8 h-8 rounded-lg ${iconColorClass} flex items-center justify-center transition-colors">
+                     <i class="fa-solid fa-${section.icon || 'hospital'}"></i>
+                </div>
+                <div class="flex flex-col">
+                    <span class="font-bold text-sm text-slate-700">${wardName}</span>
+                    <span class="text-[10px] text-slate-400 font-medium">${count} Patients</span>
+                </div>
             </div>
-            <div class="flex items-center gap-2">
-                 <span class="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-full">${count}</span>
-                 <button class="delete-ward-btn text-xs text-slate-300 hover:text-red-500 hidden group-hover:block transition-all p-1" onclick="deleteWard('${ward}')" title="Delete Ward"><i class="fa-solid fa-trash"></i></button>
-            </div>
+            
+            <button class="delete-ward-btn w-6 h-6 rounded-full hover:bg-red-100 text-slate-300 hover:text-red-500 flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100" title="Delete Section">
+                <i class="fa-solid fa-trash-can text-xs"></i>
+            </button>
         `;
-        btn.dataset.ward = ward;
+
+        // Delete Handler
+        const delBtn = btn.querySelector('.delete-ward-btn');
+        delBtn.onclick = (e) => {
+            e.stopPropagation();
+            deleteWard(wardName);
+        };
+
         list.appendChild(btn);
     });
 }
 
-function addNewWard() {
-    const name = prompt("Enter new ward name:");
-    if (!name || name.trim() === "") return;
-
-    // Check if exists
-    if (appData.wards[name]) {
-        alert("Ward already exists!");
-        selectWard(name);
-        return;
-    }
-
-    // Add locally
-    appData.wards[name] = [];
-    renderWardsSidebar();
-    selectWard(name);
-}
-
 function deleteWard(wardName) {
-    const count = appData.wards[wardName].length;
-    if (!confirm(`Are you sure you want to delete '${wardName}'?\nIt contains ${count} patients.\n\nPatients will be moved to 'Unassigned'.`)) return;
+    if (!confirm(`Delete section "${wardName}"? Patients will be moved to Unassigned.`)) return;
 
-    const patientsToUpdate = appData.wards[wardName];
-
-    // Optimistic Update
-    if (!appData.wards['Unassigned']) appData.wards['Unassigned'] = [];
-
+    // 1. Move patients to Unassigned
+    const patients = appData.wards[wardName] || [];
     const updates = {};
 
-    patientsToUpdate.forEach(p => {
+    patients.forEach(p => {
         p.ward = "Unassigned";
-        appData.wards['Unassigned'].push(p);
-        updates[p.id] = { ward: 'Unassigned' };
+        updates[p.id] = { ward: "Unassigned" };
     });
 
+    // 2. Remove Section
+    appData.sections = appData.sections.filter(s => s.name !== wardName);
     delete appData.wards[wardName];
 
-    // Refresh UI
-    renderWardsSidebar();
-    selectWard('Unassigned');
+    // 3. Sync
+    saveMetadata();
+    if (Object.keys(updates).length > 0) syncBatchUpdate(updates);
 
-    // Sync to Backend
-    if (GasApiAvailable()) {
-        syncBatchUpdate(updates);
-    }
+    // 4. Refresh
+    rebuildWardsMap(); // Re-process unassigned
+    renderWardsSidebar();
+    if (appData.currentWard === wardName) selectWard('Unassigned');
 }
 
 async function syncBatchUpdate(updates) {
@@ -2584,4 +2668,228 @@ function selectWard(wardName) {
         `;
             list.appendChild(div);
         });
+    }
+
+    // --- Section/Ward Customization Modal Logic ---
+
+    let sectionModalState = { color: 'slate', icon: 'hospital' };
+
+    function addNewWard() {
+        // Override standard prompt with Modal
+        const modal = document.getElementById('section-modal');
+        modal.classList.remove('hidden');
+        document.getElementById('new-section-name').value = '';
+
+        // Reset selection state
+        sectionModalState = { color: 'slate', icon: 'hospital' };
+        selectSectionColor('slate');
+        selectSectionIcon('hospital');
+    }
+
+    function closeSectionModal() {
+        document.getElementById('section-modal').classList.add('hidden');
+    }
+
+    function selectSectionColor(color) {
+        sectionModalState.color = color;
+        document.querySelectorAll('.section-color-btn').forEach(btn => {
+            if (btn.dataset.color === color) {
+                btn.classList.add('ring-2', 'ring-slate-400');
+            } else {
+                btn.classList.remove('ring-2', 'ring-slate-400');
+            }
+        });
+    }
+
+    function selectSectionIcon(icon) {
+        sectionModalState.icon = icon;
+        document.querySelectorAll('.section-icon-btn').forEach(btn => {
+            if (btn.dataset.icon === icon) {
+                btn.classList.add('ring-2', 'ring-slate-400', 'bg-slate-200');
+            } else {
+                btn.classList.remove('ring-2', 'ring-slate-400', 'bg-slate-200');
+            }
+        });
+    }
+
+    function confirmAddSection() {
+        const name = document.getElementById('new-section-name').value;
+        if (!name || name.trim() === "") return;
+
+        if (appData.sections.find(s => s.name === name)) {
+            alert("Section already exists!");
+            return;
+        }
+
+        const newSection = {
+            id: Date.now().toString(),
+            name: name,
+            color: sectionModalState.color,
+            icon: sectionModalState.icon,
+            isPersistent: true
+        };
+
+        appData.sections.push(newSection);
+        appData.wards[name] = []; // Init empty
+
+        saveMetadata(); // Sync to server
+        renderWardsSidebar();
+        selectWard(name);
+
+        closeSectionModal();
+    }
+
+    function quickAddStandardSections() {
+        if (!confirm("Quick Add 5 Standard Sections?\\n(Medical, Surgical, Hematology, ICU, Treatment Room)")) return;
+
+        const standards = [
+            { name: 'Medical', color: 'blue', icon: 'user-doctor' },
+            { name: 'Surgical', color: 'red', icon: 'syringe' },
+            { name: 'Hematology', color: 'purple', icon: 'flask' },
+            { name: 'ICU', color: 'orange', icon: 'heart-pulse' },
+            { name: 'Treatment Room', color: 'green', icon: 'bed-pulse' }
+        ];
+
+        let addedCount = 0;
+        standards.forEach(s => {
+            if (!appData.sections.find(existing => existing.name === s.name)) {
+                appData.sections.push({
+                    id: Date.now() + Math.random().toString(), // uniqueish
+                    name: s.name,
+                    color: s.color,
+                    icon: s.icon,
+                    isPersistent: true
+                });
+                appData.wards[s.name] = [];
+                addedCount++;
+            }
+        });
+
+        if (addedCount > 0) {
+            saveMetadata();
+            renderWardsSidebar();
+            selectWard('Medical'); // Jump to first one
+            alert(`Added ${addedCount} sections.`);
+        } else {
+            alert("All standard sections already exist.");
+        }
+    }
+
+    // --- Plan System Logic ---
+
+    function openPlanModal(patient) {
+        appData.currentPatient = patient; // Ensure context
+        const modal = document.getElementById('plan-modal');
+        modal.classList.remove('hidden');
+        resetPlanView();
+    }
+
+    function closePlanModal() {
+        document.getElementById('plan-modal').classList.add('hidden');
+    }
+
+    function resetPlanView() {
+        document.getElementById('plan-options-grid').classList.remove('hidden');
+
+        ['plan-sub-medication', 'plan-sub-equipment', 'plan-sub-note'].forEach(id => {
+            document.getElementById(id).classList.add('hidden');
+        });
+    }
+
+    function showPlanDetail(type) {
+        document.getElementById('plan-options-grid').classList.add('hidden');
+
+        if (type === 'medication') {
+            document.getElementById('plan-sub-medication').classList.remove('hidden');
+            document.getElementById('med-input-area').classList.add('hidden'); // Reset input
+        } else if (type === 'equipment') {
+            document.getElementById('plan-sub-equipment').classList.remove('hidden');
+        } else if (type.startsWith('consult') || type === 'note') {
+            const noteView = document.getElementById('plan-sub-note');
+            noteView.classList.remove('hidden');
+
+            const titles = {
+                'consult_physio': 'Physiotherapy Consult',
+                'consult_psych': 'Psychosocial Consult',
+                'consult_nutrition': 'Nutrition Consult',
+                'note': 'Add Clinical Note'
+            };
+            document.getElementById('plan-note-title').innerText = titles[type] || 'Add Note';
+            document.getElementById('plan-note-text').value = '';
+            document.getElementById('plan-note-text').dataset.type = type;
+        }
+    }
+
+    // Medication Flow
+    let currentMedAction = '';
+    function selectMedAction(action) {
+        currentMedAction = action;
+        document.getElementById('med-input-area').classList.remove('hidden');
+        document.getElementById('plan-med-details').focus();
+    }
+
+    function savePlanItem(category) {
+        if (!appData.currentPatient.plan) appData.currentPatient.plan = [];
+
+        let newItem = null;
+
+        if (category === 'medication') {
+            const details = document.getElementById('plan-med-details').value;
+            if (!details) return;
+
+            newItem = {
+                id: Date.now(),
+                type: 'medication',
+                action: currentMedAction,
+                details: details,
+                date: new Date().toISOString()
+            };
+        } else if (category === 'note') {
+            const text = document.getElementById('plan-note-text').value;
+            const type = document.getElementById('plan-note-text').dataset.type;
+            if (!text) return;
+
+            newItem = {
+                id: Date.now(),
+                type: type === 'note' ? 'note' : 'consult',
+                subType: type, // e.g. consult_physio
+                details: text,
+                date: new Date().toISOString()
+            };
+        }
+
+        if (newItem) {
+            appData.currentPatient.plan.push(newItem);
+            savePlanChanges();
+            closePlanModal();
+
+            // Refresh views
+            if (appData.currentWard) renderPatientsGrid(appData.wards[appData.currentWard]);
+        }
+    }
+
+    function saveQuickPlan(type, value) {
+        if (!appData.currentPatient.plan) appData.currentPatient.plan = [];
+
+        const newItem = {
+            id: Date.now(),
+            type: type, // 'equipment'
+            details: value,
+            date: new Date().toISOString()
+        };
+
+        appData.currentPatient.plan.push(newItem);
+        savePlanChanges();
+        closePlanModal();
+
+        if (appData.currentWard) renderPatientsGrid(appData.wards[appData.currentWard]);
+    }
+
+    function savePlanChanges() {
+        const p = appData.currentPatient;
+        const updates = {};
+        updates[p.id] = { plan: p.plan };
+
+        triggerSave(); // Local timer save
+        if (GasApiAvailable()) syncBatchUpdate(updates);
     }
