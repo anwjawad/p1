@@ -99,14 +99,23 @@ function renderPatientsGrid(patients) {
             });
         }
 
-        // --- Symptoms High Severity ---
+        // --- Symptoms (All Active) ---
         let symptomText = '';
         if (p.symptoms) {
-            const severe = Object.entries(p.symptoms)
-                .filter(([k, v]) => v >= 7)
-                .map(([k, v]) => k);
-            if (severe.length > 0) {
-                symptomText = `<span class="text-rose-500 font-bold text-xs"><i class="fa-solid fa-triangle-exclamation mr-1"></i>High: ${severe.join(', ')}</span>`;
+            const activeSymptoms = Object.entries(p.symptoms)
+                .filter(([k, v]) => v > 0)
+                .sort((a, b) => b[1] - a[1]); // Sort by severity desc
+
+            if (activeSymptoms.length > 0) {
+                const chips = activeSymptoms.map(([k, v]) => {
+                    // Color coding based on severity
+                    let colorClass = 'bg-slate-100 text-slate-600 border-slate-200';
+                    if (v >= 7) colorClass = 'bg-rose-100 text-rose-700 border-rose-200 font-bold';
+                    else if (v >= 4) colorClass = 'bg-orange-50 text-orange-700 border-orange-100';
+
+                    return `<span class="px-1.5 py-0.5 rounded border text-[10px] ${colorClass}">${k} <span class="opacity-75 text-[9px]">(${v})</span></span>`;
+                }).join('');
+                symptomText = `<div class="flex flex-wrap gap-1 mt-2">${chips}</div>`;
             }
         }
 
@@ -175,7 +184,7 @@ function renderPatientsGrid(patients) {
                 </div>` : ''}
             </div>
 
-            ${symptomText ? `<div class="bg-rose-50/50 p-2 rounded-lg border border-rose-100 mb-2">${symptomText}</div>` : ''}
+            ${symptomText ? symptomText : ''}
             
             ${planPreviewHTML}
 
