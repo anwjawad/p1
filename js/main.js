@@ -1322,6 +1322,9 @@ async function saveToBackend() {
     }
 }
 
+// Alias for manual calls
+const savePatientChanges = triggerSave;
+
 
 // ----- IMPORT LOGIC -----
 
@@ -2684,21 +2687,44 @@ function generateManualSummary(p) {
 
     // Symptoms
     if (p.symptoms) {
-        const activeSyms = Object.entries(p.symptoms)
+        let symsObj = p.symptoms;
+        if (typeof symsObj === 'string') {
+            try { symsObj = JSON.parse(symsObj); } catch (e) { symsObj = {}; }
+        }
+        const activeSyms = Object.entries(symsObj)
             .filter(([k, v]) => v && v.active === true)
             .map(([k, v]) => `${k}${v.note ? ' (' + v.note + ')' : ''}`)
             .join(', ');
         if (activeSyms) summary += `Active Symptoms: ${activeSyms}\n`;
     }
 
-    // Meds (Regular)
-    const medList = p.medications ? p.medications.split('\n').filter(l => l.trim()).join(', ') : '';
+    // Meds
+    let medList = '';
+    if (p.medications) {
+        let meds = p.medications;
+        if (typeof meds === 'string' && meds.trim().startsWith('{')) {
+            try { meds = JSON.parse(meds); } catch (e) { }
+        }
+
+        if (typeof meds === 'object') {
+            const reg = meds.regular ? `Regular: ${meds.regular.replace(/\n/g, ', ')}` : '';
+            const prn = meds.prn ? `PRN: ${meds.prn.replace(/\n/g, ', ')}` : '';
+            medList = [reg, prn].filter(Boolean).join(' | ');
+        } else {
+            medList = String(meds).replace(/\n/g, ', ');
+        }
+    }
     if (medList) summary += `Meds: ${medList}\n`;
 
-    // Labs (Critical)
+    // Labs (Critical Fix: Extract .value)
     if (p.labs) {
-        const labList = Object.entries(p.labs)
-            .map(([k, v]) => `${k}:${v}`)
+        let labsObj = p.labs;
+        if (typeof labsObj === 'string') {
+            try { labsObj = JSON.parse(labsObj); } catch (e) { labsObj = {}; }
+        }
+        const labList = Object.entries(labsObj)
+            .filter(([k, v]) => v && v.value) // Only show if has value
+            .map(([k, v]) => `${k}:${v.value}`)
             .join(', ');
         if (labList) summary += `Labs: ${labList}\n`;
     }
@@ -3115,5 +3141,5 @@ function showPlanDetail(type) {
                 }
             }, 100);
         }
-
-
+    }
+}
