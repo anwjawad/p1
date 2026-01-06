@@ -2642,6 +2642,60 @@ function resetPlanView() {
     });
 }
 
+async function generatePatientSummary(patient) {
+    if (!GasApiAvailable()) {
+        alert("AI Summary requires backend connection.");
+        return null;
+    }
+
+    try {
+        const res = await fetch(GAS_API_URL, {
+            method: 'POST',
+            mode: 'cors',
+            redirect: 'follow',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'generate_summary', patient: patient })
+        });
+
+        const json = await res.json();
+        if (json.status === 'success') {
+            return json.data;
+        } else {
+            console.error("AI Error:", json);
+            alert("AI Error: " + (json.message || "Unknown error"));
+            return null;
+        }
+    } catch (e) {
+        console.error("Summary request failed", e);
+        alert("Failed to generate summary: " + e.message);
+        return null;
+    }
+}
+
+async function handleStandaloneSummary() {
+    if (!confirm("Generate AI Summary? This will overwrite/prepend to Clinical Notes.")) return;
+
+    // Show loading
+    const notesField = document.getElementById('inp-notes');
+    const oldNotes = notesField.value;
+    notesField.value = "Generating AI Summary...";
+    notesField.disabled = true;
+
+    const summary = await generatePatientSummary(appData.currentPatient);
+
+    notesField.disabled = false;
+    if (summary) {
+        const timestamp = new Date().toLocaleDateString('en-GB'); // DD/MM/YYYY
+        // Prepend summary
+        notesField.value = `*** AI Summary (${timestamp}) ***\n${summary}\n\n${oldNotes}`;
+        // Trigger save
+        appData.currentPatient.notes = notesField.value;
+        savePatientChanges(appData.currentPatient.id);
+    } else {
+        notesField.value = oldNotes; // Revert
+    }
+}
+
 function showPlanDetail(type) {
     document.getElementById('plan-options-grid').classList.add('hidden');
 
@@ -2663,6 +2717,27 @@ function showPlanDetail(type) {
         document.getElementById('plan-note-title').innerText = titles[type] || 'Add Note';
         document.getElementById('plan-note-text').value = '';
         document.getElementById('plan-note-text').dataset.type = type;
+
+        // Auto-Suggest Summary for Consults
+        if (type.startsWith('consult')) {
+            setTimeout(async () => {
+                if (confirm("Generate AI Patient Summary for this consult?")) {
+                    const textarea = document.getElementById('plan-note-text');
+                    textarea.value = "Generating summary...";
+                    textarea.disabled = true;
+
+                    const summary = await generatePatientSummary(appData.currentPatient);
+
+                    textarea.disabled = false;
+                    if (summary) {
+                        textarea.value = summary + "\n\n---\n" + (titles[type] || 'Consult') + ": ";
+                        textarea.focus();
+                    } else {
+                        textarea.value = "";
+                    }
+                }
+            }, 100);
+        }
     }
 }
 
