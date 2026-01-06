@@ -3107,7 +3107,7 @@ function showPlanDetail(type) {
                 if (confirm('Insert Patient Summary details for this consult?')) {
                     const textarea = document.getElementById('plan-note-text');
                     const summary = generateManualSummary(appData.currentPatient);
-                    
+
                     if (summary) {
                         textarea.value = summary + '\n\n---\n' + (titles[type] || 'Consult') + ': ';
                         textarea.focus();
@@ -3115,6 +3115,5 @@ function showPlanDetail(type) {
                 }
             }, 100);
         }
-    }
-}
+
 
