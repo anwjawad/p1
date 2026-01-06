@@ -3,6 +3,7 @@
 // CONFIGURATION
 // --------------------------------------------------------
 // Use var to prevent "already declared" errors if script is double-loaded
+// TODO: Update this URL with your deployed Web App URL
 var GAS_API_URL = "https://script.google.com/macros/s/AKfycbxJ0bG4MEptJCL_4057PM1UkFXrVSp5Vyydrq4ZvAUzGt3-gqyGq4aV1UhRpi90tszK/exec";
 
 var appData = {
