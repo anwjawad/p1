@@ -126,7 +126,7 @@ function renderPatientsGrid(patients) {
         let planPreviewHTML = '';
         if (p.plan && Array.isArray(p.plan) && p.plan.length > 0) {
             planPreviewHTML = `<div class="mt-3 pt-2 border-t border-slate-50 grid grid-cols-3 gap-1">`;
-            p.plan.forEach(item => {
+            p.plan.forEach((item, i) => {
                 let colorClass = 'text-slate-600';
                 let icon = 'circle';
 
@@ -139,9 +139,15 @@ function renderPatientsGrid(patients) {
                 if (item.type === 'medication' && item.action) displayText = `<strong>${item.action}:</strong> ${item.details}`;
 
                 planPreviewHTML += `
-                    <div class="flex gap-2 items-start text-xs ${colorClass}">
+                    <div class="group/plan flex gap-2 items-start text-xs ${colorClass} relative pr-4">
                         <i class="fa-solid fa-${icon} mt-0.5 shrink-0"></i>
                         <span class="break-words font-medium leading-tight">${displayText}</span>
+                        
+                        <button class="absolute -right-1 -top-1 text-slate-300 hover:text-red-500 opacity-0 group-hover/plan:opacity-100 transition-opacity p-1" 
+                                onclick="deletePlanItem(event, '${p.id}', ${i})"
+                                title="Remove item">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
                     </div>
                 `;
             });
