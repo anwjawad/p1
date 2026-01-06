@@ -3129,17 +3129,34 @@ function showPlanDetail(type) {
 
         // Auto-Suggest Summary for Consults (Manual Summary)
         if (type.startsWith('consult')) {
-            setTimeout(() => {
-                if (confirm('Insert Patient Summary details for this consult?')) {
-                    const textarea = document.getElementById('plan-note-text');
-                    const summary = generateManualSummary(appData.currentPatient);
-
-                    if (summary) {
-                        textarea.value = summary + '\n\n---\n' + (titles[type] || 'Consult') + ': ';
-                        textarea.focus();
-                    }
-                }
-            }, 100);
         }
+    }, 100);
+}
     }
+}
+
+// --- Plan Item Deletion ---
+function deletePlanItem(event, patientId, index) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault(); // Extra safety
+    }
+
+    // Safety check for appData
+    if (!window.appData || !window.appData.patients) {
+        console.error("AppData not initialized");
+        return;
+    }
+
+    const patient = appData.patients.find(p => p.id === patientId);
+    if (!patient || !patient.plan) return;
+
+    if (!confirm("Delete this plan item?")) return;
+
+    // Remove item
+    patient.plan.splice(index, 1);
+
+    // Save and Re-render
+    if (typeof triggerSave === 'function') triggerSave();
+    if (typeof renderPatientsGrid === 'function') renderPatientsGrid(appData.patients);
 }
