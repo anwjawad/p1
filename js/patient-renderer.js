@@ -99,23 +99,26 @@ function renderPatientsGrid(patients) {
             });
         }
 
-        // --- Symptoms (All Active) ---
+        // --- Symptoms (Active + Notes) ---
         let symptomText = '';
         if (p.symptoms) {
+            // Filter where value.active is true
             const activeSymptoms = Object.entries(p.symptoms)
-                .filter(([k, v]) => v > 0)
-                .sort((a, b) => b[1] - a[1]); // Sort by severity desc
+                .filter(([k, v]) => v && v.active === true);
 
             if (activeSymptoms.length > 0) {
                 const chips = activeSymptoms.map(([k, v]) => {
-                    // Color coding based on severity
-                    let colorClass = 'bg-slate-100 text-slate-600 border-slate-200';
-                    if (v >= 7) colorClass = 'bg-rose-100 text-rose-700 border-rose-200 font-bold';
-                    else if (v >= 4) colorClass = 'bg-orange-50 text-orange-700 border-orange-100';
+                    let noteHtml = '';
+                    if (v.note && v.note.trim()) {
+                        noteHtml = `<span class="ml-1 pl-1 border-l border-rose-200 text-rose-800 italic font-normal max-w-[150px] truncate inline-block align-bottom">${v.note}</span>`;
+                    }
 
-                    return `<span class="px-1.5 py-0.5 rounded border text-[10px] ${colorClass}">${k} <span class="opacity-75 text-[9px]">(${v})</span></span>`;
+                    return `<span class="px-1.5 py-0.5 rounded border text-[10px] bg-rose-50 text-rose-700 border-rose-100 font-bold flex items-center mb-1 mr-1 w-max max-w-full">
+                        <span class="shrink-0">${k}</span>
+                        ${noteHtml}
+                    </span>`;
                 }).join('');
-                symptomText = `<div class="flex flex-wrap gap-1 mt-2">${chips}</div>`;
+                symptomText = `<div class="flex flex-wrap mt-2">${chips}</div>`;
             }
         }
 
