@@ -573,6 +573,10 @@
                     class="w-full mt-2 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
                     <i class="fa-solid fa-chart-line mr-2"></i> Analytics
                 </button>
+                <button onclick="openHistoryView()"
+                    class="w-full mt-2 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
+                    <i class="fa-solid fa-clock-rotate-left mr-2"></i> History
+                </button>
             </div>
         </aside>
 
@@ -1722,6 +1726,42 @@
     <script src="js/patient-renderer.js?v=1"></script>
     <!-- Main Logic -->
     <script src="js/main.js?v=5"></script>
+    <!-- History / Archive Modal -->
+    <div id="history-modal" class="fixed inset-0 z-[70] hidden flex items-center justify-center fade-in">
+        <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="closeHistoryModal()"></div>
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 relative z-10 animate-entry">
+            <h3 class="text-xl font-bold text-slate-800 mb-2">Time Machine</h3>
+            <p class="text-sm text-slate-500 mb-6">Select a past date to view the board state.</p>
+
+            <div id="history-loading" class="hidden py-8 text-center">
+                <i class="fa-solid fa-circle-notch fa-spin text-medical-500 mb-2"></i>
+                <p class="text-xs text-slate-400">Fetching timeline...</p>
+            </div>
+
+            <div id="history-list" class="space-y-2 max-h-60 overflow-y-auto mb-4">
+                <!-- Dates injected here -->
+            </div>
+
+            <button onclick="closeHistoryModal()"
+                class="w-full py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-200 transition-colors">
+                Cancel
+            </button>
+        </div>
+    </div>
+
+    <!-- Archive Mode Banner -->
+    <div id="archive-banner"
+        class="fixed top-0 left-0 right-0 h-14 bg-amber-400 text-amber-900 font-bold z-[100] hidden flex items-center justify-between px-6 shadow-md">
+        <div class="flex items-center gap-2">
+            <i class="fa-solid fa-clock-rotate-left text-xl"></i>
+            <span>ARCHIVE VIEW: <span id="archive-date-display">--</span></span>
+        </div>
+        <button onclick="exitHistoryMode()"
+            class="bg-white/20 hover:bg-white/40 px-4 py-1.5 rounded-lg text-sm transition-colors border border-amber-500/30">
+            Exit Timeline
+        </button>
+    </div>
+
 </body>
 
 </html>
