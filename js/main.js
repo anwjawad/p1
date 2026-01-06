@@ -3294,3 +3294,175 @@ window.triggerSave = function () {
     }
     if (originalTriggerSave) originalTriggerSave();
 };
+
+
+// --- Patient Specific History & Smart Copy ---
+
+let currentPatientHistory = []; // Cache for the currently open patient
+
+function openPatientHistory(patientId) {
+    const patient = appData.patients.find(p => p.id === patientId);
+    if (!patient) return;
+
+    const modal = document.getElementById('patient-history-modal');
+    const content = document.getElementById('patient-history-content');
+    const loading = document.getElementById('patient-history-loading');
+
+    modal.classList.remove('hidden');
+    content.innerHTML = '';
+    loading.classList.remove('hidden');
+
+    fetch(GAS_API_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'get_patient_history', id: patient.id, name: patient.name })
+    })
+        .then(r => r.json())
+        .then(json => {
+            loading.classList.add('hidden');
+            if (json.status === 'success' && json.history.length > 0) {
+                currentPatientHistory = json.history; // Cache for smart copy
+                renderPatientTimeline(json.history);
+            } else {
+                currentPatientHistory = [];
+                content.innerHTML = `
+                <div class="text-center py-10 text-slate-400">
+                    <i class="fa-regular fa-folder-open text-4xl mb-2 opacity-50"></i>
+                    <p>No prior history found.</p>
+                </div>
+            `;
+            }
+        })
+        .catch(e => {
+            console.error(e);
+            loading.classList.add('hidden');
+            content.textContent = "Error loading history.";
+        });
+}
+
+function closePatientHistoryModal() {
+    document.getElementById('patient-history-modal').classList.add('hidden');
+}
+
+function renderPatientTimeline(history) {
+    const content = document.getElementById('patient-history-content');
+    content.innerHTML = '';
+
+    history.forEach(record => {
+        const date = new Date(record.Date).toLocaleDateString();
+
+        // Build a mini summary
+        let summaryHtml = '';
+        if (record.symptoms && record.symptoms !== '{}') summaryHtml += `<div class="mb-1"><span class="font-semibold text-slate-600">Symptoms:</span> ${JSON.stringify(record.symptoms)}</div>`;
+        if (record.notes) summaryHtml += `<div class="mb-1"><span class="font-semibold text-slate-600">Notes:</span> <span class="text-slate-500">${record.notes}</span></div>`;
+        if (record.diagnosis) summaryHtml += `<div class="mb-1"><span class="font-semibold text-slate-600">Dx:</span> ${record.diagnosis}</div>`;
+
+        const item = document.createElement('div');
+        item.className = "bg-slate-50 rounded-xl p-4 border border-slate-100 flex gap-4";
+        item.innerHTML = `
+            <div class="shrink-0 flex flex-col items-center">
+                <div class="w-2 bg-slate-200 h-full rounded-full mb-1"></div>
+            </div>
+            <div class="grow text-sm">
+                <div class="font-bold text-slate-800 mb-2 bg-white inline-block px-2 py-1 rounded shadow-sm text-xs">
+                    ${date}
+                </div>
+                <div class="space-y-1">
+                    ${summaryHtml || '<span class="italic text-slate-400">No details logged.</span>'}
+                </div>
+            </div>
+        `;
+        content.appendChild(item);
+    });
+}
+
+// Check for history availability (called when opening detail modal)
+function checkAndSetupSmartCopy(patient) {
+    // We assume 'currentPatientHistory' might be empty or valid. 
+    // Ideally we shouldn't blocking-fetch every time. 
+    // Implementation Strategy: 
+    // 1. Fetch history silently in background when modal opens.
+    // 2. If found, inject buttons.
+
+    fetch(GAS_API_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'get_patient_history', id: patient.id, name: patient.name })
+    })
+        .then(r => r.json())
+        .then(json => {
+            if (json.status === 'success' && json.history.length > 0) {
+                currentPatientHistory = json.history;
+                injectSmartCopyButtons(json.history[0]); // Pass latest record
+                showHistoryAvailableBadge();
+            }
+        });
+}
+
+function showHistoryAvailableBadge() {
+    // Find a place in the modal to show "History Available"
+    // Maybe near the name
+    const header = document.querySelector('#patient-modal h2');
+    if (header && !header.querySelector('.history-badge')) {
+        const badge = document.createElement('span');
+        badge.className = "history-badge ml-3 bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full border border-amber-200 cursor-pointer hover:bg-amber-200 transition-colors";
+        badge.innerHTML = '<i class="fa-solid fa-clock-rotate-left mr-1"></i>History';
+        badge.onclick = () => openPatientHistory(appData.currentPatient.id);
+        header.appendChild(badge);
+    }
+}
+
+function injectSmartCopyButtons(latestRecord) {
+    // Fields we support copying for
+    const targets = ['diagnosis', 'notes', 'medications', 'plan']; // IDs of inputs
+
+    targets.forEach(fieldId => {
+        const input = document.getElementById(fieldId);
+        if (!input) return;
+
+        // Remove existing button if any (re-runs)
+        const wrapper = input.parentElement;
+        if (wrapper.querySelector('.smart-copy-btn')) return;
+
+        // Check if we have data to copy
+        let val = latestRecord[fieldId];
+        if (!val || val === '{}' || val === '[]') return; // Skip empty history
+
+        // Check if current input is empty (User said "on every field I fill... copy")
+        // User wants "Option" to copy.
+
+        const btn = document.createElement('button');
+        btn.type = 'button'; // Prevent submit
+        btn.className = "smart-copy-btn absolute right-2 top-2 text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded hover:bg-blue-100 transition-colors z-10 border border-blue-200 flex items-center gap-1";
+        btn.innerHTML = `<i class="fa-solid fa-paste"></i> <span class="hidden group-hover:inline">Last: ${String(val).substring(0, 15)}...</span>`;
+        btn.title = `Copy from last history:\n${val}`;
+
+        // Positioning: Input parent needs relative
+        if (window.getComputedStyle(wrapper).position === 'static') {
+            wrapper.classList.add('relative');
+        }
+
+        btn.onclick = () => {
+            if (confirm(`Replace current content with historical data?\n\n"${val}"`)) {
+                input.value = val;
+                // Trigger change event for auto-save logic if any
+                input.dispatchEvent(new Event('change'));
+                input.dispatchEvent(new Event('input'));
+            }
+        };
+
+        wrapper.appendChild(btn);
+    });
+}
+
+// Hook into showPatientDetail
+const originalShowDetail = window.showPatientDetail;
+window.showPatientDetail = function (patientId) {
+    if (originalShowDetail) originalShowDetail(patientId);
+
+    const patient = appData.patients.find(p => p.id === patientId);
+    if (patient) {
+        // Clear old history cache
+        currentPatientHistory = [];
+        // Trigger check
+        checkAndSetupSmartCopy(patient);
+    }
+};
