@@ -3249,6 +3249,8 @@ function enterHistoryMode(archivedPatients, date) {
 
     // Switch Data
     appData.patients = archivedPatients;
+    // ensure Set exists
+    appData.selectedPatientIds = new Set();
 
     // UI Update
     document.getElementById('archive-banner').classList.remove('hidden');
@@ -3267,6 +3269,9 @@ function exitHistoryMode() {
 
     // Restore
     appData = realAppData;
+    // re-init Set because JSON.stringify destroyed it
+    appData.selectedPatientIds = new Set();
+
     isHistoryMode = false;
     realAppData = null;
 
