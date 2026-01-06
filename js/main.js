@@ -2672,6 +2672,55 @@ async function generatePatientSummary(patient) {
     }
 }
 
+    }
+}
+
+function generateManualSummary(p) {
+    if (!p) return "";
+
+    let summary = `PATIENT SUMMARY\n----------------\n`;
+    summary += `Name: ${p.name || 'N/A'} (${p.age || '?'}y) - Room: ${p.room || '?'}\n`;
+    summary += `Diagnosis: ${p.diagnosis || 'Unspecified'}\n`;
+
+    // Symptoms
+    if (p.symptoms) {
+        const activeSyms = Object.entries(p.symptoms)
+            .filter(([k, v]) => v && v.active === true)
+            .map(([k, v]) => `${k}${v.note ? ' (' + v.note + ')' : ''}`)
+            .join(', ');
+        if (activeSyms) summary += `Active Symptoms: ${activeSyms}\n`;
+    }
+
+    // Meds (Regular)
+    const medList = p.medications ? p.medications.split('\n').filter(l => l.trim()).join(', ') : '';
+    if (medList) summary += `Meds: ${medList}\n`;
+
+    // Labs (Critical)
+    if (p.labs) {
+        const labList = Object.entries(p.labs)
+            .map(([k, v]) => `${k}:${v}`)
+            .join(', ');
+        if (labList) summary += `Labs: ${labList}\n`;
+    }
+
+    return summary;
+}
+
+function handleManualSummary() {
+    if (!confirm("Insert Manual Summary? This will prepend to Clinical Notes.")) return;
+
+    const notesField = document.getElementById('inp-notes');
+    const oldNotes = notesField.value;
+    const summary = generateManualSummary(appData.currentPatient);
+
+    if (summary) {
+        const timestamp = new Date().toLocaleDateString('en-GB');
+        notesField.value = `*** Manual Summary (${timestamp}) ***\n${summary}\n\n${oldNotes}`;
+        appData.currentPatient.notes = notesField.value;
+        savePatientChanges(appData.currentPatient.id);
+    }
+}
+
 async function handleStandaloneSummary() {
     if (!confirm("Generate AI Summary? This will overwrite/prepend to Clinical Notes.")) return;
 
@@ -3028,3 +3077,44 @@ function renderDiagnosisChart(diagnoses) {
         }
     });
 }
+
+// OVERRIDE: Update showPlanDetail to use Manual Summary for Consults
+function showPlanDetail(type) {
+    document.getElementById('plan-options-grid').classList.add('hidden');
+
+    if (type === 'medication') {
+        document.getElementById('plan-sub-medication').classList.remove('hidden');
+        document.getElementById('med-input-area').classList.add('hidden'); // Reset input
+    } else if (type === 'equipment') {
+        document.getElementById('plan-sub-equipment').classList.remove('hidden');
+    } else if (type.startsWith('consult') || type === 'note') {
+        const noteView = document.getElementById('plan-sub-note');
+        noteView.classList.remove('hidden');
+
+        const titles = {
+            'consult_physio': 'Physiotherapy Consult',
+            'consult_psych': 'Psychosocial Consult',
+            'consult_nutrition': 'Nutrition Consult',
+            'note': 'Add Clinical Note'
+        };
+        document.getElementById('plan-note-title').innerText = titles[type] || 'Add Note';
+        document.getElementById('plan-note-text').value = '';
+        document.getElementById('plan-note-text').dataset.type = type;
+
+        // Auto-Suggest Summary for Consults (Manual Summary)
+        if (type.startsWith('consult')) {
+            setTimeout(() => {
+                if (confirm('Insert Patient Summary details for this consult?')) {
+                    const textarea = document.getElementById('plan-note-text');
+                    const summary = generateManualSummary(appData.currentPatient);
+                    
+                    if (summary) {
+                        textarea.value = summary + '\n\n---\n' + (titles[type] || 'Consult') + ': ';
+                        textarea.focus();
+                    }
+                }
+            }, 100);
+        }
+    }
+}
+
