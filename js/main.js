@@ -3169,3 +3169,123 @@ function deletePlanItem(event, patientId, index) {
     if (typeof triggerSave === 'function') triggerSave();
     if (typeof renderPatientsGrid === 'function') renderPatientsGrid(appData.patients);
 }
+
+// --- History / Time Machine Logic ---
+let isHistoryMode = false;
+let realAppData = null; // Backup for live data
+
+function openHistoryView() {
+    const modal = document.getElementById('history-modal');
+    const list = document.getElementById('history-list');
+    const loading = document.getElementById('history-loading');
+
+    modal.classList.remove('hidden');
+    list.innerHTML = '';
+    loading.classList.remove('hidden');
+
+    // Fetch Dates
+    fetch(GAS_API_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'get_history_dates' })
+    })
+        .then(r => r.json())
+        .then(json => {
+            loading.classList.add('hidden');
+            if (json.status === 'success' && json.dates.length > 0) {
+                json.dates.reverse().forEach(date => {
+                    const btn = document.createElement('button');
+                    btn.className = "w-full text-left px-4 py-3 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-100 font-bold text-slate-700 flex justify-between items-center group transition-colors";
+                    btn.innerHTML = `
+                    <span>${date}</span>
+                    <i class="fa-solid fa-chevron-right text-slate-300 group-hover:text-slate-500"></i>
+                `;
+                    btn.onclick = () => loadHistoryDate(date);
+                    list.appendChild(btn);
+                });
+            } else {
+                list.innerHTML = '<p class="text-center text-slate-400 text-sm py-4">No archives found.</p>';
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            loading.classList.add('hidden');
+            list.innerHTML = '<p class="text-center text-red-400 text-sm py-4">Failed to load history.</p>';
+        });
+}
+
+function closeHistoryModal() {
+    document.getElementById('history-modal').classList.add('hidden');
+}
+
+function loadHistoryDate(date) {
+    if (!confirm(`Enter Read-Only Archive Mode for ${date}?`)) return;
+
+    // Backup live data if not already in history mode
+    if (!isHistoryMode) {
+        realAppData = JSON.parse(JSON.stringify(appData));
+    }
+
+    closeHistoryModal();
+
+    // Show loading overlay (re-use existing one if possible or just rely on speed)
+
+    fetch(GAS_API_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'get_history_data', date: date })
+    })
+        .then(r => r.json())
+        .then(json => {
+            if (json.status === 'success') {
+                enterHistoryMode(json.patients, date);
+            } else {
+                alert("Error loading archive: " + json.message);
+            }
+        })
+        .catch(e => alert("Network Error: " + e.message));
+}
+
+function enterHistoryMode(archivedPatients, date) {
+    isHistoryMode = true;
+
+    // Switch Data
+    appData.patients = archivedPatients;
+
+    // UI Update
+    document.getElementById('archive-banner').classList.remove('hidden');
+    document.getElementById('archive-date-display').textContent = date;
+    document.body.style.paddingTop = "3.5rem"; // Make room for banner
+
+    // Render
+    renderPatientsGrid(appData.patients);
+
+    // Disable Editing UI (Roughly)
+    document.getElementById('floating-action-bar').classList.add('hidden'); // Hide bulk actions
+}
+
+function exitHistoryMode() {
+    if (!isHistoryMode || !realAppData) return;
+
+    // Restore
+    appData = realAppData;
+    isHistoryMode = false;
+    realAppData = null;
+
+    // UI Reset
+    document.getElementById('archive-banner').classList.add('hidden');
+    document.body.style.paddingTop = "0";
+    document.getElementById('floating-action-bar').classList.remove('hidden');
+
+    // Render Live Data
+    renderPatientsGrid(appData.patients);
+}
+
+// Override Save Check
+const originalTriggerSave = window.triggerSave;
+window.triggerSave = function () {
+    if (isHistoryMode) {
+        console.warn("Save blocked: History Mode Active");
+        // Optional: toast notification "Read Only Mode"
+        return;
+    }
+    if (originalTriggerSave) originalTriggerSave();
+};
