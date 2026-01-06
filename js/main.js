@@ -2672,8 +2672,7 @@ async function generatePatientSummary(patient) {
     }
 }
 
-    }
-}
+
 
 function generateManualSummary(p) {
     if (!p) return "";
