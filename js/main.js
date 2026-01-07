@@ -3374,97 +3374,104 @@ function renderPatientTimeline(history) {
     const content = document.getElementById('patient-history-content');
     content.innerHTML = '';
 
-    const date = new Date(record.Date).toLocaleDateString(undefined, {
-        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
-    });
+    if (!history || !Array.isArray(history)) {
+        content.innerHTML = '<p class="text-center text-slate-400 py-10">No history available.</p>';
+        return;
+    }
 
-    // 1. Diagnosis
-    let dxHtml = '';
-    if (record.diagnosis) {
-        dxHtml = `
+    history.forEach((record, index) => {
+
+        const date = new Date(record.Date).toLocaleDateString(undefined, {
+            weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
+        });
+
+        // 1. Diagnosis
+        let dxHtml = '';
+        if (record.diagnosis) {
+            dxHtml = `
              <div class="text-sm text-slate-700 leading-snug font-medium border-l-2 border-blue-500 pl-3 py-0.5 my-2">
                 <span class="font-bold text-blue-600 text-[10px] uppercase bg-blue-50 px-1 rounded mr-1 align-middle">Dx</span> 
                 ${record.diagnosis}
              </div>`;
-    }
+        }
 
-    // 2. Labs (New)
-    let labsHtml = '';
-    try {
-        let lData = record.labs;
-        if (typeof lData === 'string') lData = JSON.parse(lData);
-        if (lData && typeof lData === 'object') {
-            const labBadges = Object.entries(lData).map(([k, v]) => {
-                // Simple check (no global ranges access here easily, assume string val)
-                const val = v.value || v;
-                if (!val) return '';
-                return `<span class="px-1.5 py-0.5 rounded border text-[10px] bg-indigo-50 text-indigo-700 border-indigo-100 font-bold flex items-center">
+        // 2. Labs (New)
+        let labsHtml = '';
+        try {
+            let lData = record.labs;
+            if (typeof lData === 'string') lData = JSON.parse(lData);
+            if (lData && typeof lData === 'object') {
+                const labBadges = Object.entries(lData).map(([k, v]) => {
+                    // Simple check (no global ranges access here easily, assume string val)
+                    const val = v.value || v;
+                    if (!val) return '';
+                    return `<span class="px-1.5 py-0.5 rounded border text-[10px] bg-indigo-50 text-indigo-700 border-indigo-100 font-bold flex items-center">
                         ${k} ${val}
                      </span>`;
-            }).join('');
-            if (labBadges) labsHtml = `<div class="flex flex-wrap gap-1.5 mb-2">${labBadges}</div>`;
-        }
-    } catch (e) { /* ignore */ }
+                }).join('');
+                if (labBadges) labsHtml = `<div class="flex flex-wrap gap-1.5 mb-2">${labBadges}</div>`;
+            }
+        } catch (e) { /* ignore */ }
 
-    // 3. Symptoms
-    let symptomsHtml = '';
-    try {
-        let sData = record.symptoms;
-        if (typeof sData === 'string') sData = JSON.parse(sData);
+        // 3. Symptoms
+        let symptomsHtml = '';
+        try {
+            let sData = record.symptoms;
+            if (typeof sData === 'string') sData = JSON.parse(sData);
 
-        if (sData && typeof sData === 'object') {
-            const active = Object.entries(sData).filter(([k, v]) => v && v.active === true);
-            if (active.length > 0) {
-                symptomsHtml = active.map(([k, v]) => {
-                    let note = (v.note && v.note.trim()) ? `<span class="opacity-75 relative -top-[1px] ml-1 pl-1 border-l border-rose-300 text-[9px] italic">${v.note}</span>` : '';
-                    return `<span class="px-2 py-1 rounded-md border text-xs bg-rose-50 text-rose-700 border-rose-100 font-bold inline-flex items-center text-left leading-none shadow-sm">
+            if (sData && typeof sData === 'object') {
+                const active = Object.entries(sData).filter(([k, v]) => v && v.active === true);
+                if (active.length > 0) {
+                    symptomsHtml = active.map(([k, v]) => {
+                        let note = (v.note && v.note.trim()) ? `<span class="opacity-75 relative -top-[1px] ml-1 pl-1 border-l border-rose-300 text-[9px] italic">${v.note}</span>` : '';
+                        return `<span class="px-2 py-1 rounded-md border text-xs bg-rose-50 text-rose-700 border-rose-100 font-bold inline-flex items-center text-left leading-none shadow-sm">
                             ${k}${note}
                         </span>`;
-                }).join('');
+                    }).join('');
 
-                if (symptomsHtml) symptomsHtml = `<div class="flex flex-wrap gap-1.5 mt-2">${symptomsHtml}</div>`;
+                    if (symptomsHtml) symptomsHtml = `<div class="flex flex-wrap gap-1.5 mt-2">${symptomsHtml}</div>`;
+                }
             }
-        }
-    } catch (e) { console.warn("History symptom parse error", e); }
+        } catch (e) { console.warn("History symptom parse error", e); }
 
-    // 4. Plan / Equipment (New)
-    let planHtml = '';
-    try {
-        let pData = record.plan;
-        if (typeof pData === 'string') pData = JSON.parse(pData);
-        if (Array.isArray(pData) && pData.length > 0) {
-            planHtml = `<div class="mt-3 pt-2 border-t border-slate-50 grid grid-cols-2 gap-1">`;
-            pData.forEach(item => {
-                let color = 'text-slate-600';
-                let icon = 'circle';
-                if (item.type === 'medication') { color = 'text-indigo-600'; icon = 'pills'; }
-                else if (item.type === 'equipment') { color = 'text-cyan-600'; icon = 'mask-ventilator'; }
+        // 4. Plan / Equipment (New)
+        let planHtml = '';
+        try {
+            let pData = record.plan;
+            if (typeof pData === 'string') pData = JSON.parse(pData);
+            if (Array.isArray(pData) && pData.length > 0) {
+                planHtml = `<div class="mt-3 pt-2 border-t border-slate-50 grid grid-cols-2 gap-1">`;
+                pData.forEach(item => {
+                    let color = 'text-slate-600';
+                    let icon = 'circle';
+                    if (item.type === 'medication') { color = 'text-indigo-600'; icon = 'pills'; }
+                    else if (item.type === 'equipment') { color = 'text-cyan-600'; icon = 'mask-ventilator'; }
 
-                planHtml += `<div class="flex items-center gap-1.5 text-[10px] ${color}">
+                    planHtml += `<div class="flex items-center gap-1.5 text-[10px] ${color}">
                         <i class="fa-solid fa-${icon}"></i>
                         <span class="truncate font-medium">${item.details}</span>
                     </div>`;
-            });
-            planHtml += `</div>`;
-        }
-    } catch (e) { /* ignore */ }
+                });
+                planHtml += `</div>`;
+            }
+        } catch (e) { /* ignore */ }
 
-    // 5. Notes
-    let notesHtml = '';
-    if (record.notes && record.notes.length > 0) {
-        notesHtml = `
+        // 5. Notes
+        let notesHtml = '';
+        if (record.notes && record.notes.length > 0) {
+            notesHtml = `
             <div class="mt-3 p-3 bg-yellow-50 rounded-lg text-yellow-800 text-xs border border-yellow-100 relative">
                 <i class="fa-solid fa-sticky-note absolute top-3 right-3 opacity-20 text-yellow-600"></i>
                 <span class="font-bold text-yellow-600 block mb-1">Notes:</span> 
                 <span class="leading-relaxed whitespace-pre-wrap">${record.notes}</span>
             </div>`;
-    }
+        }
 
-    // --- RENDER ITEM ---
-    const item = document.createElement('div');
-    item.className = "pl-4 pb-8 border-l-2 border-slate-100 relative last:border-0 last:pb-0";
+        // --- RENDER ITEM ---
+        const item = document.createElement('div');
+        item.className = "pl-4 pb-8 border-l-2 border-slate-100 relative last:border-0 last:pb-0";
 
-    item.innerHTML = `
+        item.innerHTML = `
             <!-- Dot -->
             <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-slate-200 border-2 border-white ring-1 ring-slate-100"></div>
             
@@ -3501,8 +3508,8 @@ function renderPatientTimeline(history) {
                 </div>
             </div>
         `;
-    content.appendChild(item);
-});
+        content.appendChild(item);
+    });
 }
 
 // Check for history availability (called when opening detail modal)
