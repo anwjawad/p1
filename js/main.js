@@ -3369,31 +3369,95 @@ function closePatientHistoryModal() {
     document.getElementById('patient-history-modal').classList.add('hidden');
 }
 
+// --- HISTORY TIMELINE RENDERER (Clean Card Style) ---
 function renderPatientTimeline(history) {
     const content = document.getElementById('patient-history-content');
     content.innerHTML = '';
 
-    history.forEach(record => {
-        const date = new Date(record.Date).toLocaleDateString();
+    history.forEach((record, index) => {
+        const date = new Date(record.Date).toLocaleDateString(undefined, {
+            weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
+        });
 
-        // Build a mini summary
-        let summaryHtml = '';
-        if (record.symptoms && record.symptoms !== '{}') summaryHtml += `<div class="mb-1"><span class="font-semibold text-slate-600">Symptoms:</span> ${JSON.stringify(record.symptoms)}</div>`;
-        if (record.notes) summaryHtml += `<div class="mb-1"><span class="font-semibold text-slate-600">Notes:</span> <span class="text-slate-500">${record.notes}</span></div>`;
-        if (record.diagnosis) summaryHtml += `<div class="mb-1"><span class="font-semibold text-slate-600">Dx:</span> ${record.diagnosis}</div>`;
+        // 1. Parse Symptoms
+        let symptomsHtml = '';
+        try {
+            let sData = record.symptoms;
+            if (typeof sData === 'string') sData = JSON.parse(sData);
 
+            if (sData && typeof sData === 'object') {
+                const active = Object.entries(sData).filter(([k, v]) => v && v.active === true);
+                if (active.length > 0) {
+                    symptomsHtml = active.map(([k, v]) => {
+                        let note = (v.note && v.note.trim()) ? `<span class="opacity-75 relative -top-[1px] ml-1 pl-1 border-l border-rose-300 text-[9px] italic">${v.note}</span>` : '';
+                        return `<span class="px-2 py-1 rounded-md border text-xs bg-rose-50 text-rose-700 border-rose-100 font-bold inline-flex items-center text-left leading-none shadow-sm">
+                            ${k}${note}
+                        </span>`;
+                    }).join('');
+
+                    if (symptomsHtml) symptomsHtml = `<div class="flex flex-wrap gap-1.5 mt-2">${symptomsHtml}</div>`;
+                }
+            }
+        } catch (e) {
+            console.warn("History symptom parse error", e);
+        }
+
+        // 2. Format Notes
+        let notesHtml = '';
+        if (record.notes && record.notes.length > 0) {
+            notesHtml = `
+            <div class="mt-3 p-3 bg-yellow-50 rounded-lg text-yellow-800 text-xs border border-yellow-100 relative">
+                <i class="fa-solid fa-sticky-note absolute top-3 right-3 opacity-20 text-yellow-600"></i>
+                <span class="font-bold text-yellow-600 block mb-1">Notes:</span> 
+                <span class="leading-relaxed whitespace-pre-wrap">${record.notes}</span>
+            </div>`;
+        }
+
+        // 3. Diagnosis
+        let dxHtml = '';
+        if (record.diagnosis) {
+            dxHtml = `
+             <div class="text-sm text-slate-700 leading-snug font-medium border-l-2 border-blue-500 pl-3 py-0.5 my-2">
+                <span class="font-bold text-blue-600 text-[10px] uppercase bg-blue-50 px-1 rounded mr-1 align-middle">Dx</span> 
+                ${record.diagnosis}
+             </div>`;
+        }
+
+        // --- RENDER ITEM ---
         const item = document.createElement('div');
-        item.className = "bg-slate-50 rounded-xl p-4 border border-slate-100 flex gap-4";
+        // Timeline connector look
+        item.className = "pl-4 pb-8 border-l-2 border-slate-100 relative last:border-0 last:pb-0";
+
         item.innerHTML = `
-            <div class="shrink-0 flex flex-col items-center">
-                <div class="w-2 bg-slate-200 h-full rounded-full mb-1"></div>
+            <!-- Dot -->
+            <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-slate-200 border-2 border-white ring-1 ring-slate-100"></div>
+            
+            <!-- Date Header -->
+            <div class="mb-3 flex items-center gap-2">
+                 <span class="bg-slate-100 text-slate-500 text-xs font-bold px-2 py-1 rounded-full border border-slate-200">
+                    <i class="fa-regular fa-calendar mr-1"></i> ${date}
+                 </span>
+                 ${index === 0 ? '<span class="text-[10px] font-bold text-medical-600 bg-medical-50 px-1.5 rounded uppercase tracking-wider">Latest</span>' : ''}
             </div>
-            <div class="grow text-sm">
-                <div class="font-bold text-slate-800 mb-2 bg-white inline-block px-2 py-1 rounded shadow-sm text-xs">
-                    ${date}
-                </div>
-                <div class="space-y-1">
-                    ${summaryHtml || '<span class="italic text-slate-400">No details logged.</span>'}
+
+            <!-- Card Content -->
+            <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 hover:shadow-md transition-shadow relative overflow-hidden group">
+                                
+                ${dxHtml}
+                
+                ${symptomsHtml}
+                
+                ${notesHtml}
+
+                <!-- Empty State -->
+                ${(!dxHtml && !symptomsHtml && !notesHtml) ? '<p class="text-slate-400 italic text-xs">No significant clinical data recorded.</p>' : ''}
+                
+                <!-- Smart Copy Button Overlay (Visible on Hover) -->
+                <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                     <button onclick="injectSmartCopyButtons(${JSON.stringify(record).replace(/"/g, '&quot;')})" 
+                             class="text-[10px] bg-slate-800 text-white px-2 py-1 rounded shadow hover:bg-slate-600 transition-colors" title="Enable Smart Copy for this record">
+                         <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Use
+                     </button>
                 </div>
             </div>
         `;
