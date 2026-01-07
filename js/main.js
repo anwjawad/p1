@@ -3741,7 +3741,15 @@ function renderPatientsGrid(patients) {
             if (appData.selectionMode) {
                 togglePatientSelection(p.id, card);
             } else {
-                window.showPatientDetail(p.id);
+                // Fix: Call the correct modal function
+                if (typeof openModal === 'function') {
+                    openModal(p);
+                    // Trigger History Check explicitly since we bypassed the wrapper
+                    if (typeof checkAndSetupSmartCopy === 'function') checkAndSetupSmartCopy(p);
+                } else {
+                    console.error("openModal function missing!");
+                    alert("Error: Cannot open patient. Try reloading.");
+                }
             }
         };
 
