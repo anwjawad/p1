@@ -3391,9 +3391,16 @@ function checkAndSetupSmartCopy(patient) {
         .then(r => r.json())
         .then(json => {
             if (json.status === 'success' && json.history.length > 0) {
+                // alert("Debug: History Found! Adding Badge..."); 
                 currentPatientHistory = json.history;
-                injectSmartCopyButtons(json.history[0]); // Pass latest record
+
+                // Show badge FIRST (Critical UI)
                 showHistoryAvailableBadge();
+
+                // Then try to inject buttons (might fail if IDs don't match)
+                try {
+                    injectSmartCopyButtons(json.history[0]);
+                } catch (e) { console.error("Smart Copy Injection Error", e); }
             }
         });
 }
@@ -3513,22 +3520,17 @@ function injectSmartCopyButtons(latestRecord) {
 // Hook into showPatientDetail
 const originalShowDetail = window.showPatientDetail;
 window.showPatientDetail = function (patientId) {
-    console.log("Wrapper: showPatientDetail called for", patientId);
+    // alert("Debug: Opening Patient " + patientId); // Stage 1
     if (originalShowDetail) {
         originalShowDetail(patientId);
-    } else {
-        console.error("Wrapper: originalShowDetail is undefined!");
     }
 
     const patient = appData.patients.find(p => p.id === patientId);
     if (patient) {
-        console.log("Wrapper: Found patient data", patient);
         // Clear old history cache
         currentPatientHistory = [];
         // Trigger check
         checkAndSetupSmartCopy(patient);
-    } else {
-        console.error("Wrapper: Patient not found in appData");
     }
 };
 
