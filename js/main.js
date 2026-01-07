@@ -3562,44 +3562,197 @@ function testHistoryConnection() {
     const testId = prompt("Enter Patient ID or Code to test:", "PAT108425");
     if (!testId) return;
 
-    alert(`Testing Connection for: ${testId}...\nPlease wait.`);
+    alert(`Testing Connection...\n1. Global Index\n2. Patient Specific (${testId})`);
 
-    // We send it as 'code' primarily, but also 'id' just in case
-    const payload = {
-        action: 'get_patient_history',
-        id: testId,        // As ID
-        code: testId,      // As Code
-        name: "DEBUG_TEST" // Dummy
-    };
-
-    console.log("Sending Debug Payload:", payload);
-
+    // Test 1: Global Index
     fetch(GAS_API_URL, {
         method: 'POST',
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ action: 'get_history_index' })
     })
         .then(r => r.json())
-        .then(json => {
-            console.log("Debug Response:", json);
-
-            let msg = `Status: ${json.status}\n`;
-
-            if (json.history === undefined) {
-                msg += "CRITICAL ERROR: 'history' field is MISSING in response.\n\nCAUSE: The Server Code is OLD (Not Deployed).\n\nSOLUTION: Go to Apps Script -> Deploy -> New Deployment.";
-            } else {
-                msg += `History Records Found: ${json.history.length}\n`;
-                if (json.history.length > 0) {
-                    msg += `Latest Date: ${json.history[0].Date}\n`;
-                    msg += "SUCCESS! The system works.";
+        .then(idxJson => {
+            let idxMsg = "INDEX CHECK:\n";
+            if (idxJson.status === 'success') {
+                idxMsg += `IDs Found: ${idxJson.ids.length}\nCodes Found: ${idxJson.codes.length}\n`;
+                if (idxJson.ids.includes(testId) || idxJson.codes.includes(testId)) {
+                    idxMsg += "✅ THIS ID WAS FOUND IN INDEX (Badge should show!)\n";
                 } else {
-                    msg += "WARNING: Server works, but no records found for this ID.\nDouble check the ID matches the History_Log sheet.";
+                    idxMsg += "⚠️ ID NOT IN INDEX (Badge will NOT show)\n";
                 }
+            } else {
+                idxMsg += "❌ Index Fetch Failed (Backend Error)\n";
             }
 
-            alert(msg);
+            console.log("Index Result:", idxJson);
+
+            // Test 2: Specific Patient
+            fetch(GAS_API_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'get_patient_history',
+                    id: testId,
+                    code: testId,
+                    name: "DEBUG_TEST"
+                })
+            })
+                .then(r => r.json())
+                .then(json => {
+                    console.log("Details Result:", json);
+                    let msg = idxMsg + "\nDETAILS CHECK:\n";
+
+                    if (json.history === undefined) {
+                        msg += "CRITICAL: 'history' missing. Update Backend Code.\n";
+                    } else {
+                        msg += `History Records: ${json.history.length}\n`;
+                        if (json.history.length > 0) msg += "✅ Details Fetch Success.";
+                        else msg += "⚠️ Details Empty.";
+                    }
+
+                    alert(msg);
+                })
+                .catch(e => alert("Details Error: " + e.message));
         })
-        .catch(e => {
-            console.error(e);
-            alert("NETWORK ERROR:\n" + e.message);
-        });
+        .catch(e => alert("Index Error: " + e.message));
 }
+
+// --- OVERRIDE: Render Patients Grid (Global History Aware) ---
+// We override this to ensure we can inject the History Badge efficiently
+
+function renderPatientsGrid(patients) {
+    const grid = document.getElementById('patients-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    // Safety check
+    if (!patients || !Array.isArray(patients)) {
+        patients = [];
+    }
+
+    if (patients.length === 0) {
+        grid.innerHTML = `<div class="col-span-full text-center py-20 text-slate-400">
+            <i class="fa-solid fa-bed-pulse text-4xl mb-4 opacity-20"></i>
+            <p>No patients in this view.</p>
+        </div>`;
+        document.getElementById('patient-count').innerText = "0";
+        return;
+    }
+
+    document.getElementById('patient-count').innerText = patients.length;
+
+    patients.forEach(p => {
+        // --- History Check ---
+        const hasHistory = appData.historyIndex.ids.has(String(p.id)) ||
+            (p.code && appData.historyIndex.codes.has(String(p.code)));
+
+        // --- Selection Mode Logic ---
+        const isSelected = appData.selectedPatientIds.has(p.id);
+        const selectMode = appData.selectionMode;
+
+        // Styles
+        let baseClass = "bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-all cursor-pointer relative group animate-entry";
+        if (isSelected) baseClass += " ring-2 ring-medical-500 bg-medical-50";
+        if (p.is_highlighted) baseClass += " ring-2 ring-yellow-400 bg-yellow-50";
+
+        // Markers
+        const hasMeds = p.medications && p.medications.length > 2; // Rough check
+        const hasSyms = p.symptoms && Object.keys(typeof p.symptoms === 'object' ? p.symptoms : {}).some(k => p.symptoms[k].active);
+
+        const card = document.createElement('div');
+        card.className = baseClass;
+
+        // Icon (Theme aware)
+        const iconClass = (typeof getThemeIcon === 'function') ? getThemeIcon('doctor') : 'fa-solid fa-user-doctor';
+
+        card.innerHTML = `
+            <!-- Selection Checkbox (Visible in Mode) -->
+            <div class="${selectMode ? '' : 'hidden'} absolute top-4 right-4 z-20">
+                <div class="checkbox-indicator w-6 h-6 rounded-full border ${isSelected ? 'bg-medical-500 border-medical-500' : 'bg-white border-slate-300'} flex items-center justify-center transition-colors">
+                    <i class="fa-solid fa-check text-white text-xs ${isSelected ? '' : 'hidden'}"></i>
+                </div>
+            </div>
+
+            <!-- Header -->
+            <div class="flex items-start justify-between mb-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
+                         <i class="${iconClass}"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-800 leading-tight line-clamp-1" title="${p.name}">${p.name}</h3>
+                        <div class="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+                             <span class="font-mono bg-slate-100 px-1.5 rounded">${p.code || 'NO-ID'}</span>
+                             <span>• ${p.age || '?'}y</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- History Badge (Top Right if not in select mode) -->
+                ${hasHistory ? `
+                <div class="${selectMode ? 'hidden' : ''} absolute top-4 right-4" title="History Available">
+                    <span class="flex items-center gap-1 bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200 shadow-sm history-badge-indicator">
+                        <i class="fa-solid fa-clock-rotate-left"></i> History
+                    </span>
+                </div>
+                ` : ''}
+            </div>
+            
+            <!-- Room & Ward -->
+            <div class="flex items-center gap-4 text-xs text-slate-500 mb-3 ml-1">
+                <div class="flex items-center gap-1.5">
+                    <i class="fa-solid fa-door-open text-slate-400"></i>
+                    <span class="font-medium text-slate-700">${p.room || 'TBD'}</span>
+                </div>
+                ${p.ward ? `<div class="flex items-center gap-1.5">
+                    <i class="fa-solid fa-layer-group text-slate-400"></i>
+                    <span>${p.ward}</span>
+                </div>` : ''}
+            </div>
+            
+            <!-- Diagnosis -->
+            <div class="mb-4 min-h-[1.5rem]">
+                <p class="text-sm text-slate-600 line-clamp-2 leading-relaxed">
+                    <span class="font-bold text-slate-400 text-xs uppercase mr-1">Dx:</span>
+                    ${p.diagnosis || '<span class="italic text-slate-300">Unspecified</span>'}
+                </p>
+            </div>
+            
+            <!-- Footer Indicators -->
+            <div class="flex items-center gap-2 pt-3 border-t border-slate-50">
+                <!-- Meds -->
+                <div class="px-2 py-1 rounded bg-slate-50 text-slate-400 text-[10px] font-bold flex items-center gap-1 ${hasMeds ? 'text-indigo-600 bg-indigo-50' : ''}">
+                    <i class="fa-solid fa-pills"></i> Meds
+                </div>
+                
+                <!-- Symptoms -->
+                <div class="px-2 py-1 rounded bg-slate-50 text-slate-400 text-[10px] font-bold flex items-center gap-1 ${hasSyms ? 'text-rose-600 bg-rose-50' : ''}">
+                    <i class="fa-solid fa-face-flushed"></i> Syms
+                </div>
+                
+                <!-- Notes (if non-empty) -->
+                ${(p.notes && p.notes.length > 5) ? `
+                <div class="px-2 py-1 rounded bg-yellow-50 text-yellow-600 text-[10px] font-bold flex items-center gap-1">
+                    <i class="fa-solid fa-sticky-note"></i> Note
+                </div>` : ''}
+            </div>
+        `;
+
+        // Interaction
+        card.onclick = (e) => {
+            if (appData.selectionMode) {
+                togglePatientSelection(p.id, card);
+            } else {
+                window.showPatientDetail(p.id);
+            }
+        };
+
+        grid.appendChild(card);
+    });
+}
+
+// Check History Index on Startup
+loadHistoryIndex();
+
+// Notify User of Update
+setTimeout(() => {
+    if (appData.historyIndex.ids.size === 0) console.log("System V2 Loaded - Index Empty (Wait for fetch)");
+}, 2000);
