@@ -579,6 +579,11 @@ function checkLabStatus(name, value) {
 
 function openModal(patient) {
     appData.currentPatient = patient;
+
+    // Clear old history cache & Trigger Check
+    currentPatientHistory = [];
+    if (typeof checkAndSetupSmartCopy === 'function') checkAndSetupSmartCopy(patient);
+
     const modal = document.getElementById('patient-modal');
     const panel = document.getElementById('modal-panel');
 
@@ -3613,148 +3618,6 @@ function testHistoryConnection() {
                 .catch(e => alert("Details Error: " + e.message));
         })
         .catch(e => alert("Index Error: " + e.message));
-}
-
-// --- OVERRIDE: Render Patients Grid (Global History Aware) ---
-// We override this to ensure we can inject the History Badge efficiently
-
-function renderPatientsGrid(patients) {
-    const grid = document.getElementById('patients-grid');
-    if (!grid) return;
-    grid.innerHTML = '';
-
-    // Safety check
-    if (!patients || !Array.isArray(patients)) {
-        patients = [];
-    }
-
-    if (patients.length === 0) {
-        grid.innerHTML = `<div class="col-span-full text-center py-20 text-slate-400">
-            <i class="fa-solid fa-bed-pulse text-4xl mb-4 opacity-20"></i>
-            <p>No patients in this view.</p>
-        </div>`;
-        document.getElementById('patient-count').innerText = "0";
-        return;
-    }
-
-    document.getElementById('patient-count').innerText = patients.length;
-
-    patients.forEach(p => {
-        // --- History Check ---
-        const hasHistory = appData.historyIndex.ids.has(String(p.id)) ||
-            (p.code && appData.historyIndex.codes.has(String(p.code)));
-
-        // --- Selection Mode Logic ---
-        const isSelected = appData.selectedPatientIds.has(p.id);
-        const selectMode = appData.selectionMode;
-
-        // Styles
-        let baseClass = "bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-all cursor-pointer relative group animate-entry";
-        if (isSelected) baseClass += " ring-2 ring-medical-500 bg-medical-50";
-        if (p.is_highlighted) baseClass += " ring-2 ring-yellow-400 bg-yellow-50";
-
-        // Markers
-        const hasMeds = p.medications && p.medications.length > 2; // Rough check
-        const hasSyms = p.symptoms && Object.keys(typeof p.symptoms === 'object' ? p.symptoms : {}).some(k => p.symptoms[k].active);
-
-        const card = document.createElement('div');
-        card.className = baseClass;
-
-        // Icon (Theme aware)
-        const iconClass = (typeof getThemeIcon === 'function') ? getThemeIcon('doctor') : 'fa-solid fa-user-doctor';
-
-        card.innerHTML = `
-            <!-- Selection Checkbox (Visible in Mode) -->
-            <div class="${selectMode ? '' : 'hidden'} absolute top-4 right-4 z-20">
-                <div class="checkbox-indicator w-6 h-6 rounded-full border ${isSelected ? 'bg-medical-500 border-medical-500' : 'bg-white border-slate-300'} flex items-center justify-center transition-colors">
-                    <i class="fa-solid fa-check text-white text-xs ${isSelected ? '' : 'hidden'}"></i>
-                </div>
-            </div>
-
-            <!-- Header -->
-            <div class="flex items-start justify-between mb-3">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
-                         <i class="${iconClass}"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-bold text-slate-800 leading-tight line-clamp-1" title="${p.name}">${p.name}</h3>
-                        <div class="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
-                             <span class="font-mono bg-slate-100 px-1.5 rounded">${p.code || 'NO-ID'}</span>
-                             <span>• ${p.age || '?'}y</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- History Badge (Top Right if not in select mode) -->
-                ${hasHistory ? `
-                <div class="${selectMode ? 'hidden' : ''} absolute top-4 right-4" title="History Available">
-                    <span class="flex items-center gap-1 bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200 shadow-sm history-badge-indicator">
-                        <i class="fa-solid fa-clock-rotate-left"></i> History
-                    </span>
-                </div>
-                ` : ''}
-            </div>
-            
-            <!-- Room & Ward -->
-            <div class="flex items-center gap-4 text-xs text-slate-500 mb-3 ml-1">
-                <div class="flex items-center gap-1.5">
-                    <i class="fa-solid fa-door-open text-slate-400"></i>
-                    <span class="font-medium text-slate-700">${p.room || 'TBD'}</span>
-                </div>
-                ${p.ward ? `<div class="flex items-center gap-1.5">
-                    <i class="fa-solid fa-layer-group text-slate-400"></i>
-                    <span>${p.ward}</span>
-                </div>` : ''}
-            </div>
-            
-            <!-- Diagnosis -->
-            <div class="mb-4 min-h-[1.5rem]">
-                <p class="text-sm text-slate-600 line-clamp-2 leading-relaxed">
-                    <span class="font-bold text-slate-400 text-xs uppercase mr-1">Dx:</span>
-                    ${p.diagnosis || '<span class="italic text-slate-300">Unspecified</span>'}
-                </p>
-            </div>
-            
-            <!-- Footer Indicators -->
-            <div class="flex items-center gap-2 pt-3 border-t border-slate-50">
-                <!-- Meds -->
-                <div class="px-2 py-1 rounded bg-slate-50 text-slate-400 text-[10px] font-bold flex items-center gap-1 ${hasMeds ? 'text-indigo-600 bg-indigo-50' : ''}">
-                    <i class="fa-solid fa-pills"></i> Meds
-                </div>
-                
-                <!-- Symptoms -->
-                <div class="px-2 py-1 rounded bg-slate-50 text-slate-400 text-[10px] font-bold flex items-center gap-1 ${hasSyms ? 'text-rose-600 bg-rose-50' : ''}">
-                    <i class="fa-solid fa-face-flushed"></i> Syms
-                </div>
-                
-                <!-- Notes (if non-empty) -->
-                ${(p.notes && p.notes.length > 5) ? `
-                <div class="px-2 py-1 rounded bg-yellow-50 text-yellow-600 text-[10px] font-bold flex items-center gap-1">
-                    <i class="fa-solid fa-sticky-note"></i> Note
-                </div>` : ''}
-            </div>
-        `;
-
-        // Interaction
-        card.onclick = (e) => {
-            if (appData.selectionMode) {
-                togglePatientSelection(p.id, card);
-            } else {
-                // Fix: Call the correct modal function
-                if (typeof openModal === 'function') {
-                    openModal(p);
-                    // Trigger History Check explicitly since we bypassed the wrapper
-                    if (typeof checkAndSetupSmartCopy === 'function') checkAndSetupSmartCopy(p);
-                } else {
-                    console.error("openModal function missing!");
-                    alert("Error: Cannot open patient. Try reloading.");
-                }
-            }
-        };
-
-        grid.appendChild(card);
-    });
 }
 
 // Check History Index on Startup
