@@ -3513,13 +3513,68 @@ function injectSmartCopyButtons(latestRecord) {
 // Hook into showPatientDetail
 const originalShowDetail = window.showPatientDetail;
 window.showPatientDetail = function (patientId) {
-    if (originalShowDetail) originalShowDetail(patientId);
+    console.log("Wrapper: showPatientDetail called for", patientId);
+    if (originalShowDetail) {
+        originalShowDetail(patientId);
+    } else {
+        console.error("Wrapper: originalShowDetail is undefined!");
+    }
 
     const patient = appData.patients.find(p => p.id === patientId);
     if (patient) {
+        console.log("Wrapper: Found patient data", patient);
         // Clear old history cache
         currentPatientHistory = [];
         // Trigger check
         checkAndSetupSmartCopy(patient);
+    } else {
+        console.error("Wrapper: Patient not found in appData");
     }
 };
+
+// --- DEBUG TOOL ---
+function testHistoryConnection() {
+    const testId = prompt("Enter Patient ID or Code to test:", "PAT108425");
+    if (!testId) return;
+
+    alert(`Testing Connection for: ${testId}...\nPlease wait.`);
+
+    // We send it as 'code' primarily, but also 'id' just in case
+    const payload = {
+        action: 'get_patient_history',
+        id: testId,        // As ID
+        code: testId,      // As Code
+        name: "DEBUG_TEST" // Dummy
+    };
+
+    console.log("Sending Debug Payload:", payload);
+
+    fetch(GAS_API_URL, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    })
+        .then(r => r.json())
+        .then(json => {
+            console.log("Debug Response:", json);
+
+            let msg = `Status: ${json.status}\n`;
+
+            if (json.history === undefined) {
+                msg += "CRITICAL ERROR: 'history' field is MISSING in response.\n\nCAUSE: The Server Code is OLD (Not Deployed).\n\nSOLUTION: Go to Apps Script -> Deploy -> New Deployment.";
+            } else {
+                msg += `History Records Found: ${json.history.length}\n`;
+                if (json.history.length > 0) {
+                    msg += `Latest Date: ${json.history[0].Date}\n`;
+                    msg += "SUCCESS! The system works.";
+                } else {
+                    msg += "WARNING: Server works, but no records found for this ID.\nDouble check the ID matches the History_Log sheet.";
+                }
+            }
+
+            alert(msg);
+        })
+        .catch(e => {
+            console.error(e);
+            alert("NETWORK ERROR:\n" + e.message);
+        });
+}
