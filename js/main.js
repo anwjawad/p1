@@ -3314,7 +3314,7 @@ function openPatientHistory(patientId) {
 
     fetch(GAS_API_URL, {
         method: 'POST',
-        body: JSON.stringify({ action: 'get_patient_history', id: patient.id, name: patient.name })
+        body: JSON.stringify({ action: 'get_patient_history', id: patient.id, name: patient.name, code: patient.code })
     })
         .then(r => r.json())
         .then(json => {
@@ -3376,6 +3376,7 @@ function renderPatientTimeline(history) {
 }
 
 // Check for history availability (called when opening detail modal)
+// Check for history availability (called when opening detail modal)
 function checkAndSetupSmartCopy(patient) {
     // We assume 'currentPatientHistory' might be empty or valid. 
     // Ideally we shouldn't blocking-fetch every time. 
@@ -3385,7 +3386,7 @@ function checkAndSetupSmartCopy(patient) {
 
     fetch(GAS_API_URL, {
         method: 'POST',
-        body: JSON.stringify({ action: 'get_patient_history', id: patient.id, name: patient.name })
+        body: JSON.stringify({ action: 'get_patient_history', id: patient.id, name: patient.name, code: patient.code })
     })
         .then(r => r.json())
         .then(json => {
