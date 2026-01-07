@@ -3398,16 +3398,45 @@ function checkAndSetupSmartCopy(patient) {
 }
 
 function showHistoryAvailableBadge() {
-    // Find a place in the modal to show "History Available"
-    // Maybe near the name
-    const header = document.querySelector('#patient-modal h2');
-    if (header && !header.querySelector('.history-badge')) {
-        const badge = document.createElement('span');
-        badge.className = "history-badge ml-3 bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full border border-amber-200 cursor-pointer hover:bg-amber-200 transition-colors";
-        badge.innerHTML = '<i class="fa-solid fa-clock-rotate-left mr-1"></i>History';
-        badge.onclick = () => openPatientHistory(appData.currentPatient.id);
-        header.appendChild(badge);
+    // Find the name input container
+    const nameInput = document.getElementById('modal-patient-name');
+    if (!nameInput) return;
+
+    const wrapper = nameInput.parentElement; // The div with class "flex-1 mr-4"
+    if (!wrapper) return;
+
+    // Check if badge already exists
+    if (wrapper.querySelector('.history-badge')) return;
+
+    const badge = document.createElement('span');
+    badge.className = "history-badge inline-flex items-center gap-1 ml-2 bg-amber-100 text-amber-700 text-xs font-bold px-2 py-0.5 rounded-full border border-amber-200 cursor-pointer hover:bg-amber-200 transition-colors align-middle";
+    badge.innerHTML = '<i class="fa-solid fa-clock-rotate-left"></i> History';
+    badge.onclick = (e) => {
+        e.stopPropagation(); // Prevent focusing input if it bubbles
+        openPatientHistory(appData.currentPatient.id);
+    };
+
+    // Insert after the name input (or append to wrapper, but name is block-like 100% width?)
+    // The name input has class "w-full". It might push the badge to next line. 
+    // Let's modify the name input to NOT be w-full, or put them in a flex row.
+
+    // Better strategy: The wrapper is "flex-1 mr-4". It contains input + div(details).
+    // Let's create a flex row for the Title + Badge.
+
+    // 1. Create a container for Name + Badge if not exists
+    let titleRow = wrapper.querySelector('.name-badge-row');
+    if (!titleRow) {
+        titleRow = document.createElement('div');
+        titleRow.className = "name-badge-row flex items-center gap-2";
+        // Move input into it
+        nameInput.parentNode.insertBefore(titleRow, nameInput);
+        titleRow.appendChild(nameInput);
+        // Fix input width if needed, but flex should handle it
+        nameInput.classList.remove('w-full');
+        nameInput.classList.add('flex-1'); // Grow to fill space
     }
+
+    titleRow.appendChild(badge);
 }
 
 function injectSmartCopyButtons(latestRecord) {
