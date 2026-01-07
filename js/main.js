@@ -3613,47 +3613,96 @@ function showHistoryAvailableBadge() {
     console.log("History Badge: Added successfully.");
 }
 
-function injectSmartCopyButtons(latestRecord) {
-    // Fields we support copying for
-    const targets = ['diagnosis', 'notes', 'medications', 'plan']; // IDs of inputs
 
-    targets.forEach(fieldId => {
-        const input = document.getElementById(fieldId);
+function injectSmartCopyButtons(latestRecord) {
+    // Mapping: Record Key -> Input ID
+    const mapping = {
+        'diagnosis': 'inp-diagnosis',
+        'notes': 'inp-notes',
+        'treatment': 'inp-treatment'
+    };
+
+    // 1. Simple Fields
+    Object.entries(mapping).forEach(([key, inputId]) => {
+        const input = document.getElementById(inputId);
         if (!input) return;
 
-        // Remove existing button if any (re-runs)
+        // Cleanup old button
         const wrapper = input.parentElement;
-        if (wrapper.querySelector('.smart-copy-btn')) return;
+        if (wrapper.style.position !== 'relative') wrapper.style.position = 'relative';
+        const oldBtn = wrapper.querySelector('.smart-copy-btn');
+        if (oldBtn) oldBtn.remove();
 
-        // Check if we have data to copy
-        let val = latestRecord[fieldId];
-        if (!val || val === '{}' || val === '[]') return; // Skip empty history
-
-        // Check if current input is empty (User said "on every field I fill... copy")
-        // User wants "Option" to copy.
+        let val = latestRecord[key];
+        if (!val || typeof val !== 'string' || val.trim() === '') return;
 
         const btn = document.createElement('button');
-        btn.type = 'button'; // Prevent submit
-        btn.className = "smart-copy-btn absolute right-2 top-2 text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded hover:bg-blue-100 transition-colors z-10 border border-blue-200 flex items-center gap-1";
-        btn.innerHTML = `<i class="fa-solid fa-paste"></i> <span class="hidden group-hover:inline">Last: ${String(val).substring(0, 15)}...</span>`;
-        btn.title = `Copy from last history:\n${val}`;
-
-        // Positioning: Input parent needs relative
-        if (window.getComputedStyle(wrapper).position === 'static') {
-            wrapper.classList.add('relative');
-        }
+        btn.type = 'button';
+        btn.className = "smart-copy-btn absolute right-2 top-2 text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded hover:bg-indigo-100 transition-colors z-20 border border-indigo-200 flex items-center gap-1 opacity-70 hover:opacity-100";
+        btn.innerHTML = `<i class="fa-solid fa-paste"></i> Copy Old`;
+        btn.title = `Paste from history:\n${val}`;
 
         btn.onclick = () => {
-            if (confirm(`Replace current content with historical data?\n\n"${val}"`)) {
-                input.value = val;
-                // Trigger change event for auto-save logic if any
-                input.dispatchEvent(new Event('change'));
-                input.dispatchEvent(new Event('input'));
-            }
+            // Flash effect
+            input.style.transition = 'all 0.2s';
+            input.style.backgroundColor = '#e0e7ff';
+            setTimeout(() => input.style.backgroundColor = '', 300);
+
+            // Paste
+            // If field has content, maybe append or replace? Replace is safer for "Correction".
+            // Let's ask or just Replace. "Smart Copy" implies replacing usually in this context.
+            if (input.value && !confirm(`Replace current text with historical data?\n\n"${val}"`)) return;
+
+            input.value = val;
+            input.dispatchEvent(new Event('input')); // Trigger Save
+            triggerSave();
         };
 
         wrapper.appendChild(btn);
     });
+
+    // 2. Medications (Complex)
+    // We try to handle 'medications' if it exists
+    if (latestRecord.medications) {
+        let meds = latestRecord.medications;
+        if (typeof meds === 'string') {
+            try { meds = JSON.parse(meds); }
+            catch (e) { meds = { regular: meds }; } // Fallback to raw string as regular
+        }
+
+        // Regular
+        if (meds.regular) {
+            addMedCopyBtn('inp-medications-regular', meds.regular);
+        }
+        // PRN
+        if (meds.prn) {
+            addMedCopyBtn('inp-medications-prn', meds.prn);
+        }
+    }
+}
+
+function addMedCopyBtn(inputId, text) {
+    const input = document.getElementById(inputId);
+    if (!input || !text) return;
+
+    const wrapper = input.parentElement;
+    if (wrapper.style.position !== 'relative') wrapper.style.position = 'relative';
+    const oldBtn = wrapper.querySelector('.smart-copy-btn');
+    if (oldBtn) oldBtn.remove();
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = "smart-copy-btn absolute right-2 top-2 text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded hover:bg-indigo-100 transition-colors z-20 border border-indigo-200 flex items-center gap-1 opacity-70 hover:opacity-100";
+    btn.innerHTML = `<i class="fa-solid fa-file-import"></i> Restore`;
+    btn.title = `Restore meds from history`;
+
+    btn.onclick = () => {
+        if (input.value && !confirm("Replace current medications with historical list?")) return;
+        input.value = text;
+        input.dispatchEvent(new Event('input'));
+        triggerSave();
+    };
+    wrapper.appendChild(btn);
 }
 
 // Hook into showPatientDetail
