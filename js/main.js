@@ -3385,13 +3385,21 @@ function renderPatientTimeline(history) {
             weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
         });
 
-        // 1. Diagnosis
+        // 1. Diagnosis & Treatment
         let dxHtml = '';
         if (record.diagnosis) {
-            dxHtml = `
+            dxHtml += `
              <div class="text-sm text-slate-700 leading-snug font-medium border-l-2 border-blue-500 pl-3 py-0.5 my-2">
                 <span class="font-bold text-blue-600 text-[10px] uppercase bg-blue-50 px-1 rounded mr-1 align-middle">Dx</span> 
                 ${record.diagnosis}
+             </div>`;
+        }
+
+        if (record.treatment) {
+            dxHtml += `
+             <div class="text-sm text-slate-600 leading-snug font-medium border-l-2 border-emerald-500 pl-3 py-0.5 my-2">
+                <span class="font-bold text-emerald-600 text-[10px] uppercase bg-emerald-50 px-1 rounded mr-1 align-middle">Rx</span> 
+                ${record.treatment}
              </div>`;
         }
 
