@@ -39,8 +39,29 @@ var appData = {
     },
     currentWard: null,
 
-    currentPatient: null
+    currentPatient: null,
+    historyIndex: { ids: new Set(), codes: new Set() }
 };
+
+// Pre-load history existence index
+function loadHistoryIndex() {
+    console.log("Loading History Index...");
+    fetch(GAS_API_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'get_history_index' })
+    })
+        .then(r => r.json())
+        .then(json => {
+            if (json.status === 'success') {
+                appData.historyIndex.ids = new Set(json.ids);
+                appData.historyIndex.codes = new Set(json.codes);
+                console.log("History Index Loaded:", appData.historyIndex);
+                // Re-render grid if data is already loaded to show badges
+                if (appData.patients.length > 0) renderPatientsGrid(appData.patients);
+            }
+        })
+        .catch(e => console.error("History Index Load Failed", e));
+}
 
 // Search Logic
 function setupSearch() {
@@ -3378,12 +3399,16 @@ function renderPatientTimeline(history) {
 // Check for history availability (called when opening detail modal)
 // Check for history availability (called when opening detail modal)
 function checkAndSetupSmartCopy(patient) {
-    // We assume 'currentPatientHistory' might be empty or valid. 
-    // Ideally we shouldn't blocking-fetch every time. 
-    // Implementation Strategy: 
-    // 1. Fetch history silently in background when modal opens.
-    // 2. If found, inject buttons.
+    // 1. OPTIMISTIC CHECK: Instant Badge
+    // If we know they have history from our index, show badge immediately
+    if (appData.historyIndex &&
+        (appData.historyIndex.ids.has(String(patient.id)) ||
+            (patient.code && appData.historyIndex.codes.has(String(patient.code))))) {
+        console.log("Optimistic History Badge: Showing...");
+        showHistoryAvailableBadge();
+    }
 
+    // 2. Fetch Data for Smart Copy / Timeline
     fetch(GAS_API_URL, {
         method: 'POST',
         body: JSON.stringify({ action: 'get_patient_history', id: patient.id, name: patient.name, code: patient.code })
@@ -3391,13 +3416,11 @@ function checkAndSetupSmartCopy(patient) {
         .then(r => r.json())
         .then(json => {
             if (json.status === 'success' && json.history.length > 0) {
-                // alert("Debug: History Found! Adding Badge..."); 
                 currentPatientHistory = json.history;
 
-                // Show badge FIRST (Critical UI)
+                // Ensure badge is shown (in case index was outdated)
                 showHistoryAvailableBadge();
 
-                // Then try to inject buttons (might fail if IDs don't match)
                 try {
                     injectSmartCopyButtons(json.history[0]);
                 } catch (e) { console.error("Smart Copy Injection Error", e); }
