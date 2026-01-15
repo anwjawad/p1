@@ -5,7 +5,7 @@
 var SHEET_NAME = 'Patients';
 var METADATA_SHEET_NAME = 'Metadata'; // New Sheet for Settings/Sections
 var LOCK_WAIT_MS = 10000;
-var GEMINI_API_KEY = 'AIzaSyDyxZSczhZoJ7OnIJxwV053VnFSzG2j6MY'; 
+var GEMINI_API_KEY = 'AIzaSyCgEFZD3ulhQYflQokknERqcHrTAerS-XA'; 
 
 // --- CORS Config ---
 function doOptions(e) {
@@ -93,6 +93,18 @@ function doPost(e) {
            break;
         case 'get_analytics':
            result = handleGetAnalyticsData();
+           break;
+        case 'get_history_dates':
+           result = handleGetArchivedDates();
+           break;
+        case 'get_history_data':
+           result = handleGetArchiveForDate(data.date);
+           break;
+        case 'get_history_index':
+           result = handleGetHistoryIndex();
+           break;
+        case 'get_patient_history':
+           result = handleGetPatientHistory(data.id, data.name, data.code);
            break;
         default:
           // Single Update
@@ -197,7 +209,7 @@ function handleGetAnalyticsData() {
 // --- AI Handlers ---
 
 function callGemini(prompt) {
-  var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + GEMINI_API_KEY;
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + GEMINI_API_KEY;
   var payload = {
     contents: [{
       parts: [{ text: prompt }]
@@ -216,7 +228,7 @@ function callGemini(prompt) {
   var text = response.getContentText();
 
   if (code === 429) {
-     throw new Error("AI is busy (Rate Limit). Please wait a minute and try again.");
+     throw new Error("AI is busy (Rate Limit) or Quota Exceeded. Detail: " + text);
   }
   
   if (code !== 200) {
@@ -326,53 +338,278 @@ function handleDailyReset() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = getWorkingSheet();
   var historySheet = ss.getSheetByName('History_Log');
+  
   if (!historySheet) {
     historySheet = ss.insertSheet('History_Log');
-    historySheet.appendRow(['Date', 'Patient Name', 'ID', 'Diagnosis', 'Notes', 'Medications', 'Symptoms', 'Labs']);
+    // Initialize with standard headers if creating new
+    historySheet.appendRow(['Date', 'Archive_Timestamp', 'id', 'name', 'diagnosis', 'notes', 'medications', 'symptoms', 'labs']);
   }
   
   var data = sheet.getDataRange().getValues();
-  var headers = data[0];
-  var symptomsIdx = headers.indexOf('symptoms');
-  var labsIdx = headers.indexOf('labs');
+  if (data.length < 2) return { status: 'success', message: 'No patients to reset' };
+
+  var sourceHeaders = data[0]; // Headers from Patients sheet
+  var historyHeaders = historySheet.getRange(1, 1, 1, historySheet.getLastColumn()).getValues()[0];
   
-  // Archive
+  // 1. SYNC HEADERS: Ensure History has all columns that Patients has (plus our archive specific ones)
+  // We want to map Patients columns -> History columns
+  // Standard Archive Columns we enforce: 'Date'
+  
+  var missingHeaders = [];
+  sourceHeaders.forEach(function(h) {
+      if (historyHeaders.indexOf(h) === -1) missingHeaders.push(h);
+  });
+  
+  if (missingHeaders.length > 0) {
+      historySheet.getRange(1, historySheet.getLastColumn() + 1, 1, missingHeaders.length).setValues([missingHeaders]);
+      // Refetch headers
+      historyHeaders = historySheet.getRange(1, 1, 1, historySheet.getLastColumn()).getValues()[0];
+  }
+
+  // 2. PREPARE ARCHIVE DATA
   var timestamp = new Date();
-  var archiveData = [];
+  var dateStr = timestamp.toLocaleDateString('en-CA'); // YYYY-MM-DD standard
+  var archiveRows = [];
   
-  // Skip header, start at row 1
   for (var i = 1; i < data.length; i++) {
-    var row = data[i];
-    // Map to History Columns: Date, Name, ID, Diagnosis, Notes, Meds, Symptoms, Labs
-    archiveData.push([
-      timestamp,
-      row[headers.indexOf('name')],
-      row[headers.indexOf('id')],
-      row[headers.indexOf('diagnosis')],
-      row[headers.indexOf('notes')],
-      row[headers.indexOf('medications')],
-      row[headers.indexOf('symptoms')],
-      row[headers.indexOf('labs')]
-    ]);
+      var sourceRow = data[i];
+      var newHistoryRow = new Array(historyHeaders.length).fill(''); // Start empty
+      
+      // Auto-Fill 'Date' if it exists (it should)
+      var dateIdx = historyHeaders.indexOf('Date');
+      if (dateIdx > -1) newHistoryRow[dateIdx] = timestamp;
+      
+      // Map other fields
+      sourceHeaders.forEach(function(sHeader, sIdx) {
+          var targetIdx = historyHeaders.indexOf(sHeader);
+          if (targetIdx > -1) {
+              newHistoryRow[targetIdx] = sourceRow[sIdx];
+          }
+      });
+      
+      archiveRows.push(newHistoryRow);
+  }
+  
+  // 3. WRITE ARCHIVE
+  if (archiveRows.length > 0) {
+      historySheet.getRange(historySheet.getLastRow() + 1, 1, archiveRows.length, archiveRows[0].length).setValues(archiveRows);
+  }
+  
+  // 4. WIPE DASHBOARD (User Requirement)
+  // Clear everything from Row 2 downwards on the Patients sheet
+  sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();
+  
+  return { status: 'success', archived_count: archiveRows.length, message: 'New Day Started. perfectly archived and cleared.' };
+}
+
+function handleGetArchivedDates() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var historySheet = ss.getSheetByName('History_Log');
+  if (!historySheet) return { status: 'success', dates: [] };
+  
+  var data = historySheet.getDataRange().getValues();
+  if (data.length < 2) return { status: 'success', dates: [] };
+  
+  var dateSet = {};
+  // Date is Col 1 (index 0)
+  for (var i = 1; i < data.length; i++) {
+    var d = new Date(data[i][0]);
+    if (!isNaN(d.getTime())) {
+        var key = d.toLocaleDateString(); // Local format ok for display
+        dateSet[key] = true;
+    }
+  }
+  
+  return { status: 'success', dates: Object.keys(dateSet) };
+}
+
+function handleGetArchiveForDate(dateString) {
+   var ss = SpreadsheetApp.getActiveSpreadsheet();
+   var historySheet = ss.getSheetByName('History_Log');
+   if (!historySheet) return { status: 'error', message: 'No history log found' };
+   
+   var data = historySheet.getDataRange().getValues();
+   if (data.length < 2) return { status: 'success', patients: [], date: dateString };
+
+   var headers = data[0];
+   var output = [];
+   
+   // Date is strictly in column 0 for check
+   for (var i = 1; i < data.length; i++) {
+       var rowDate = new Date(data[i][0]);
+       // Check validity and match (using locale string for broad match)
+       if (!isNaN(rowDate.getTime())) {
+           var rowDateStr = rowDate.toLocaleDateString('en-CA'); // Compare aligned formats
+           
+           // Fallback for different locale formats if needed, but en-CA (YYYY-MM-DD) is what we write.
+           // The client might send a different 'dateString' format.
+           // Let's rely on the client sending the same format as 'get_history_dates' returns.
+           
+           // We'll trust the string comparison primarily
+           var rowDateLocal = rowDate.toLocaleDateString();
+           
+           // Match logic: Try standard ISO match first, then local match
+           if (rowDateStr === dateString || rowDateLocal === dateString) {
+               
+               // Reconstruct Patient Object from Row
+               var patient = {};
+               headers.forEach(function(h, colIdx) {
+                   var val = data[i][colIdx];
+                   // Parse JSON fields if they look like JSON
+                   if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
+                       try {
+                           val = JSON.parse(val);
+                       } catch (e) { }
+                   }
+                   // Exclude 'Date' and 'Archive_Timestamp' from the patient object needed for the board
+                   if (h !== 'Date' && h !== 'Archive_Timestamp') {
+                       patient[h] = val;
+                   }
+               });
+               
+               // Ensure essential fields exist
+               if (patient.id && patient.name) {
+                   output.push(patient);
+               }
+           }
+       }
+   }
+   
+   return { status: 'success', patients: output, date: dateString };
+}
+
+// --- Global History Index (Optimized) ---
+function handleGetHistoryIndex() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var historySheet = ss.getSheetByName('History_Log');
+    if (!historySheet) return { status: 'success', ids: [], codes: [] };
     
-    // Reset Logic in memory
-    if (symptomsIdx > -1) row[symptomsIdx] = '';
-    if (labsIdx > -1) row[labsIdx] = '';
-  }
-  
-  // Write Archive
-  if (archiveData.length > 0) {
-    historySheet.getRange(historySheet.getLastRow() + 1, 1, archiveData.length, archiveData[0].length).setValues(archiveData);
-  }
-  
-  // Updates Main Sheet (FULL WIPE)
-  // User requested to clear everything (Patients, Meds, etc) to start fresh.
-  if (data.length > 1) {
-     // Clear everything from Row 2 downwards
-     sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();
-  }
-  
-  return { status: 'success', archived_count: archiveData.length };
+    var data = historySheet.getDataRange().getValues();
+    if (data.length < 2) return { status: 'success', ids: [], codes: [] };
+    
+    var headers = data[0];
+    var idIdx = -1;
+    var codeIdx = -1;
+    
+    headers.forEach((h, i) => {
+        var lower = h.toLowerCase();
+        if (lower === 'id') idIdx = i;
+        if (lower === 'code' || lower === 'patient code') codeIdx = i;
+    });
+    
+    var ids = new Set();
+    var codes = new Set();
+    
+    // Scan Data
+    for (var i = 1; i < data.length; i++) {
+        var row = data[i];
+        
+        // 1. Header Based
+        if (idIdx > -1 && row[idIdx]) ids.add(String(row[idIdx]));
+        if (codeIdx > -1 && row[codeIdx]) codes.add(String(row[codeIdx]));
+        
+        // 2. Brute Force Fallback (Row Scan) - Optional but good for safety
+        // To be safe against column shifts, we could scan for strings looking like PAT...
+        if (codeIdx === -1) { 
+             row.forEach(cell => {
+                 var str = String(cell);
+                 if (str.startsWith('PAT') && str.length > 3) codes.add(str);
+             });
+        }
+    }
+    
+    return { 
+        status: 'success', 
+        ids: Array.from(ids), 
+        codes: Array.from(codes) 
+    };
+}   
+
+function handleGetPatientHistory(id, name, code) {
+    if (!id && !name && !code) return { status: 'error', message: 'Need ID, Name, or Code' };
+    
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var historySheet = ss.getSheetByName('History_Log');
+    if (!historySheet) return { status: 'success', history: [] }; // No history yet
+    
+    var data = historySheet.getDataRange().getValues();
+    if (data.length < 2) return { status: 'success', history: [] };
+    
+    var headers = data[0];
+    
+    // Fallback indices (assuming standard dynamic logic if name changes)
+    // But let's find indices dynamicall
+    var idIdx = -1; 
+    var nameIdx = -1;
+    var codeIdx = -1;
+    var dateIdx = 0;
+    
+    // Case-insensitive header find
+    headers.forEach((h, i) => {
+        var lower = h.toLowerCase();
+        if (lower === 'id') idIdx = i;
+        if (lower === 'name' || lower === 'patient name') nameIdx = i;
+        if (lower === 'code' || lower === 'patient code') codeIdx = i;
+        if (lower === 'date') dateIdx = i;
+    });
+    
+    var found = [];
+    
+    for (var i = 1; i < data.length; i++) {
+        var row = data[i];
+        var match = false;
+        
+        // 1. Header-based Code Match
+        if (code && codeIdx > -1 && String(row[codeIdx]) === String(code)) {
+             match = true;
+        }
+        // 2. Header-based ID Match
+        else if (id && idIdx > -1 && String(row[idIdx]) === String(id)) {
+            match = true;
+        } 
+        // 3. Header-based Name Match
+        else if (name && nameIdx > -1 && row[nameIdx] && String(row[nameIdx]).toLowerCase().trim() === String(name).toLowerCase().trim()) {
+            match = true;
+        }
+
+        // 4. BRUTE FORCE FALLBACK (If header logic failed but data exists)
+        if (!match) {
+            // Check all cells for ID (timestamp) - highly unique
+            if (id && row.some(cell => String(cell) == String(id))) {
+                match = true;
+            }
+            // Check all cells for Code (e.g. PAT...) - highly unique
+            else if (code && code.length > 3 && row.some(cell => String(cell) == String(code))) {
+                 match = true;
+            }
+        }
+        
+        if (match) {
+             // Reconstruct object
+             var fp = {};
+             headers.forEach(function(h, c) {
+                 var val = row[c];
+                 // Try parse JSON
+                 if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
+                     try { val = JSON.parse(val); } catch(e) {}
+                 }
+                 fp[h] = val;
+             });
+             found.push(fp);
+        }
+    }
+    
+    // Sort Newest First
+    found.sort((a, b) => {
+        var da = new Date(a.Date || 0);
+        var db = new Date(b.Date || 0);
+        return db - da; // Descending
+    });
+    
+    // Limit to latest 10 to save bandwidth? No, user wants history. Maybe 20.
+    if (found.length > 20) found = found.slice(0, 20);
+    
+    return { status: 'success', history: found };
 }
 
 function handleGetDriveFiles(folderId) {

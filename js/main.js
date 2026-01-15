@@ -1087,7 +1087,17 @@ function renderModalLabs(labs) {
             container.appendChild(wrapper);
         });
 
-        // 3. "Add Lab" Button
+        // 3. "Calc Corrected Ca" Button
+        const calcBtn = document.createElement('button');
+        calcBtn.className = "flex flex-col items-center justify-center p-2 rounded-lg border border-slate-200 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 hover:border-indigo-300 transition-all h-20 shadow-sm";
+        calcBtn.innerHTML = `
+            <i class="fa-solid fa-calculator text-lg mb-1"></i>
+            <span class="text-[9px] font-bold uppercase text-center leading-tight">Corrected<br>Calcium</span>
+        `;
+        calcBtn.onclick = openCalciumCalculator;
+        container.appendChild(calcBtn);
+
+        // 4. "Add Lab" Button
         const addBtn = document.createElement('button');
         addBtn.className = "flex flex-col items-center justify-center p-2 rounded-lg border border-dashed border-slate-300 text-slate-400 hover:border-medical-400 hover:text-medical-600 hover:bg-slate-50 transition-all h-20";
         addBtn.innerHTML = `
@@ -1107,6 +1117,143 @@ function renderModalLabs(labs) {
         console.error("Critical renderModalLabs error:", err);
         alert("UI Error: " + err.message);
     }
+}
+
+// --- Corrected Calcium Calculator ---
+
+function openCalciumCalculator() {
+    // 1. Get current values if available
+    const labs = appData.currentPatient.labs || {};
+    const currentCa = labs['Ca'] ? labs['Ca'].value : '';
+    const currentAlb = labs['Alb'] ? labs['Alb'].value : '';
+
+    // 2. Create Modal Elements dynamically
+    let calcModal = document.getElementById('calc-modal');
+    if (!calcModal) {
+        calcModal = document.createElement('div');
+        calcModal.id = 'calc-modal';
+        calcModal.className = 'fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-entry';
+        calcModal.innerHTML = `
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 relative border border-slate-200 transform transition-all scale-100">
+                <button onclick="closeCalciumCalculator()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors">
+                    <i class="fa-solid fa-times text-xl"></i>
+                </button>
+                
+                <h3 class="text-xl font-bold text-slate-800 mb-1">Corrected Calcium</h3>
+                <p class="text-xs text-slate-500 mb-4">Formula: Serum Ca + 0.8 × (4 - Serum Alb)</p>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Serum Calcium (mg/dL)</label>
+                        <input type="text" id="calc-ca" inputmode="decimal"
+                            class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-medical-500 outline-none text-lg font-bold text-slate-700 placeholder-slate-300"
+                            placeholder="e.g. 8.0">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Serum Albumin (g/dL)</label>
+                        <input type="text" id="calc-alb" inputmode="decimal"
+                            class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-medical-500 outline-none text-lg font-bold text-slate-700 placeholder-slate-300"
+                            placeholder="e.g. 3.5">
+                    </div>
+
+                    <div class="p-5 bg-indigo-600 rounded-xl border border-indigo-700 text-center shadow-inner">
+                        <span class="block text-xs text-indigo-200 font-bold uppercase tracking-wider mb-1">Calculated Result</span>
+                        <div id="calc-result" class="text-4xl font-black text-white tracking-tight my-1">--</div>
+                        <span class="text-xs text-indigo-200">mg/dL</span>
+                    </div>
+
+                    <button onclick="addCorrectedCalciumToLabs()" id="btn-add-calc" disabled
+                        class="w-full py-3 bg-slate-800 text-white rounded-xl font-bold shadow-lg hover:shadow-xl hover:bg-slate-700 transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="fa-solid fa-plus-circle mr-2"></i> Add to Labs
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(calcModal);
+    } else {
+        calcModal.classList.remove('hidden');
+    }
+
+    // 3. Populate
+    const inpCa = document.getElementById('calc-ca');
+    const inpAlb = document.getElementById('calc-alb');
+
+    inpCa.value = currentCa;
+    inpAlb.value = currentAlb;
+
+    // Focus first empty input
+    setTimeout(() => {
+        if (!inpCa.value) inpCa.focus();
+        else if (!inpAlb.value) inpAlb.focus();
+    }, 100);
+
+    // 4. Attach Listeners
+    const update = () => {
+        // Robust Parse: Handle commas as decimals
+        const safeParse = (val) => {
+            if (!val) return NaN;
+            return parseFloat(val.toString().replace(',', '.'));
+        };
+
+        const ca = safeParse(inpCa.value);
+        const alb = safeParse(inpAlb.value);
+        const btn = document.getElementById('btn-add-calc');
+        const resDiv = document.getElementById('calc-result');
+
+        if (!isNaN(ca) && !isNaN(alb)) {
+            // Formula: Ca + 0.8 * (4 - Alb)
+            const corrected = ca + 0.8 * (4 - alb);
+            resDiv.innerText = corrected.toFixed(2);
+            btn.disabled = false;
+            // Highlight result
+            resDiv.classList.remove('opacity-50');
+        } else {
+            resDiv.innerText = "--";
+            btn.disabled = true;
+            resDiv.classList.add('opacity-50');
+        }
+    };
+
+    // Events: use input and keyup for robustness
+    inpCa.oninput = update;
+    inpCa.onkeyup = update;
+    inpAlb.oninput = update;
+    inpAlb.onkeyup = update;
+
+    // Enter key support
+    const handleEnter = (e) => {
+        if (e.key === 'Enter') {
+            update(); // Ensure latest state
+            const btn = document.getElementById('btn-add-calc');
+            if (!btn.disabled) addCorrectedCalciumToLabs();
+        }
+    };
+    inpCa.onkeydown = handleEnter;
+    inpAlb.onkeydown = handleEnter;
+
+    // Initial Run
+    update();
+}
+
+function closeCalciumCalculator() {
+    const m = document.getElementById('calc-modal');
+    if (m) m.classList.add('hidden');
+}
+
+function addCorrectedCalciumToLabs() {
+    const resDiv = document.getElementById('calc-result');
+    const val = resDiv.innerText;
+
+    if (val === '--' || !val) return;
+
+    if (!appData.currentPatient.labs) appData.currentPatient.labs = {};
+
+    appData.currentPatient.labs['Cor. Calcium'] = { value: val, unit: 'mg/dL' };
+
+    triggerSave();
+    renderModalLabs(appData.currentPatient.labs);
+    closeCalciumCalculator();
 }
 
 function renderModalSymptoms(symptoms) {
