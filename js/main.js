@@ -4082,17 +4082,27 @@ function openImageLightbox(url) {
             <button onclick="closeImageLightbox()" class="absolute top-4 right-4 text-white/50 hover:text-white transition-colors z-20">
                 <i class="fa-solid fa-times text-4xl"></i>
             </button>
-            <img id="lightbox-img" src="" class="max-w-[95vw] max-h-[95vh] object-contain shadow-2xl rounded-sm transform transition-transform duration-300 scale-95" />
+            <div class="relative group" id="lightbox-container">
+                <img id="lightbox-img" src="" class="max-w-[95vw] max-h-[95vh] object-contain shadow-2xl rounded-sm transform transition-transform duration-300 scale-95" />
+                <div id="magnifier-lens" class="absolute w-40 h-40 border-2 border-white/50 rounded-xl shadow-2xl pointer-events-none hidden bg-no-repeat bg-white lg:block"></div>
+            </div>
+            <div class="absolute bottom-4 text-white/50 text-xs hidden lg:block">Hover to Magnify</div>
         `;
         // Close on background click
         lightbox.onclick = (e) => {
             if (e.target === lightbox) closeImageLightbox();
         };
         document.body.appendChild(lightbox);
+
+        // Attach Magnifier Events
+        setupMagnifier();
     }
 
     const img = document.getElementById('lightbox-img');
+    const lens = document.getElementById('magnifier-lens');
+
     img.src = url;
+    if (lens) lens.style.backgroundImage = `url('${url}')`;
 
     lightbox.classList.remove('hidden');
     // Animate in
@@ -4100,6 +4110,35 @@ function openImageLightbox(url) {
         img.classList.remove('scale-95');
         img.classList.add('scale-100');
     });
+}
+
+// Global Magnifier Settings (Default)
+let magSettings = {
+    size: 160,
+    zoom: 2.5
+};
+
+function updateMagnifierSettings() {
+    const sizeInput = document.getElementById('rng-lens-size');
+    const zoomInput = document.getElementById('rng-lens-zoom');
+
+    if (sizeInput && zoomInput) {
+        magSettings.size = parseInt(sizeInput.value);
+        magSettings.zoom = parseFloat(zoomInput.value);
+
+        // Update Labels
+        const lblSize = document.getElementById('lbl-lens-size');
+        const lblZoom = document.getElementById('lbl-lens-zoom');
+        if (lblSize) lblSize.textContent = magSettings.size + 'px';
+        if (lblZoom) lblZoom.textContent = magSettings.zoom + 'x';
+
+        // Update Live if Open
+        const lens = document.getElementById('magnifier-lens');
+        if (lens) {
+            lens.style.width = magSettings.size + 'px';
+            lens.style.height = magSettings.size + 'px';
+        }
+    }
 }
 
 function closeImageLightbox() {
@@ -4111,8 +4150,49 @@ function closeImageLightbox() {
         setTimeout(() => {
             lightbox.classList.add('hidden');
             img.src = ''; // Clear to stop loading
+            const lens = document.getElementById('magnifier-lens');
+            if (lens) lens.style.backgroundImage = '';
         }, 200);
     }
+}
+
+function setupMagnifier() {
+    const container = document.getElementById('lightbox-container');
+    const img = document.getElementById('lightbox-img');
+    const lens = document.getElementById('magnifier-lens');
+    const zoomLevel = 2.5;
+
+    if (!container || !img || !lens) return;
+
+    container.addEventListener('mousemove', (e) => {
+        if (!img.complete || img.naturalWidth === 0) return;
+        const rect = img.getBoundingClientRect();
+        let x = e.clientX - rect.left;
+        let y = e.clientY - rect.top;
+
+        if (x < 0 || x > rect.width || y < 0 || y > rect.height) {
+            lens.classList.add('hidden');
+            return;
+        }
+        lens.classList.remove('hidden');
+
+        const lensW = lens.offsetWidth / 2;
+        const lensH = lens.offsetHeight / 2;
+        lens.style.left = (x - lensW) + 'px';
+        lens.style.top = (y - lensH) + 'px';
+
+        const xPerc = x / rect.width;
+        const yPerc = y / rect.height;
+        lens.style.backgroundSize = (rect.width * zoomLevel) + 'px ' + (rect.height * zoomLevel) + 'px';
+
+        const bgX = (xPerc * (rect.width * zoomLevel)) - lensW;
+        const bgY = (yPerc * (rect.height * zoomLevel)) - lensH;
+        lens.style.backgroundPosition = `-${bgX}px -${bgY}px`;
+    });
+
+    container.addEventListener('mouseleave', () => {
+        lens.classList.add('hidden');
+    });
 }
 
 // --- Paste Handlers ---

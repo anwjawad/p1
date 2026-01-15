@@ -1251,6 +1251,36 @@
                     </div>
                 </div>
 
+                <!-- Magnifier Settings (Temporary) -->
+                <div class="mb-6">
+                    <h4 class="font-bold text-sm text-slate-700 uppercase tracking-wide mb-3">Magnifier Settings (Temp)
+                    </h4>
+
+                    <div class="space-y-4">
+                        <!-- Lens Size -->
+                        <div>
+                            <div class="flex justify-between text-xs text-slate-500 mb-1">
+                                <span>Lens Size</span>
+                                <span id="lbl-lens-size">160px</span>
+                            </div>
+                            <input type="range" min="100" max="400" step="10" value="160" id="rng-lens-size"
+                                class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-medical-600"
+                                oninput="updateMagnifierSettings()">
+                        </div>
+
+                        <!-- Zoom Level -->
+                        <div>
+                            <div class="flex justify-between text-xs text-slate-500 mb-1">
+                                <span>Zoom Level</span>
+                                <span id="lbl-lens-zoom">2.5x</span>
+                            </div>
+                            <input type="range" min="1.5" max="5.0" step="0.5" value="2.5" id="rng-lens-zoom"
+                                class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-medical-600"
+                                oninput="updateMagnifierSettings()">
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Theme Mode -->
                 <div>
                     <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Appearance</h4>
