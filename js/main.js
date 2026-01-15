@@ -4071,129 +4071,149 @@ function renderLabImages() {
 }
 
 // --- Lightbox Logic ---
+// --- Lightbox Variables ---
+let lightboxState = {
+    scale: 1,
+    panning: false,
+    pointX: 0,
+    pointY: 0,
+    startX: 0,
+    startY: 0
+};
+
 function openImageLightbox(url) {
+    // Reset State
+    lightboxState = { scale: 1, panning: false, pointX: 0, pointY: 0, startX: 0, startY: 0 };
+
     // Check if lightbox exists
     let lightbox = document.getElementById('lightbox-modal');
     if (!lightbox) {
         lightbox = document.createElement('div');
         lightbox.id = 'lightbox-modal';
-        lightbox.className = 'fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center animate-fade-in hidden';
+        lightbox.className = 'fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center animate-fade-in hidden';
         lightbox.innerHTML = `
+            <!-- Toolbar -->
+            <div class="absolute top-4 left-1/2 transform -translate-x-1/2 flex items-center gap-4 z-30 bg-black/50 backdrop-blur-md rounded-full px-6 py-2 border border-white/10">
+                <button onclick="resetLightboxZoom()" class="text-white/70 hover:text-white transition-colors flex items-center gap-2 text-sm font-bold">
+                    <i class="fa-solid fa-expand"></i> Reset
+                </button>
+            </div>
+
             <button onclick="closeImageLightbox()" class="absolute top-4 right-4 text-white/50 hover:text-white transition-colors z-20">
                 <i class="fa-solid fa-times text-4xl"></i>
             </button>
-            <div class="relative group" id="lightbox-container">
-                <img id="lightbox-img" src="" class="max-w-[95vw] max-h-[95vh] object-contain shadow-2xl rounded-sm transform transition-transform duration-300 scale-95" />
-                <div id="magnifier-lens" class="absolute w-40 h-40 border-2 border-white/50 rounded-xl shadow-2xl pointer-events-none hidden bg-no-repeat bg-white lg:block"></div>
+            
+            <div class="relative group overflow-hidden w-full h-full flex items-center justify-center" id="lightbox-container">
+                <img id="lightbox-img" src="" class="max-w-none max-h-none object-contain shadow-2xl transition-transform duration-100 ease-out origin-center cursor-grab" style="max-width: 95vw; max-height: 95vh;" />
             </div>
-            <div class="absolute bottom-4 text-white/50 text-xs hidden lg:block">Hover to Magnify</div>
+            
+            <div class="absolute bottom-4 text-white/50 text-xs hidden lg:block" id="lightbox-hint">Scroll to Zoom &bull; Drag to Pan</div>
         `;
-        // Close on background click
+        // Close on background click (only if not panning)
         lightbox.onclick = (e) => {
-            if (e.target === lightbox) closeImageLightbox();
+            if (e.target === lightbox && !lightboxState.panning) closeImageLightbox();
         };
         document.body.appendChild(lightbox);
 
-        // Attach Magnifier Events
-        setupMagnifier();
+        // Attach Events
+        setupPanZoom();
     }
 
     const img = document.getElementById('lightbox-img');
-    const lens = document.getElementById('magnifier-lens');
 
     img.src = url;
-    if (lens) lens.style.backgroundImage = `url('${url}')`;
+
+    updateLightboxUI();
 
     lightbox.classList.remove('hidden');
-    // Animate in
-    requestAnimationFrame(() => {
-        img.classList.remove('scale-95');
-        img.classList.add('scale-100');
-    });
 }
 
-// Global Magnifier Settings (Default)
-let magSettings = {
-    size: 160,
-    zoom: 2.5
-};
+function updateLightboxUI() {
+    const img = document.getElementById('lightbox-img');
+    const hint = document.getElementById('lightbox-hint');
 
-function updateMagnifierSettings() {
-    const sizeInput = document.getElementById('rng-lens-size');
-    const zoomInput = document.getElementById('rng-lens-zoom');
+    // Pan Mode
+    hint.textContent = "Scroll to Zoom • Drag to Pan";
+    img.style.cursor = lightboxState.panning ? 'grabbing' : 'grab';
 
-    if (sizeInput && zoomInput) {
-        magSettings.size = parseInt(sizeInput.value);
-        magSettings.zoom = parseFloat(zoomInput.value);
+    // Apply Transform
+    img.style.transform = `translate(${lightboxState.pointX}px, ${lightboxState.pointY}px) scale(${lightboxState.scale})`;
+}
 
-        // Update Labels
-        const lblSize = document.getElementById('lbl-lens-size');
-        const lblZoom = document.getElementById('lbl-lens-zoom');
-        if (lblSize) lblSize.textContent = magSettings.size + 'px';
-        if (lblZoom) lblZoom.textContent = magSettings.zoom + 'x';
+function resetLightboxZoom() {
+    lightboxState.scale = 1;
+    lightboxState.pointX = 0;
+    lightboxState.pointY = 0;
+    updateLightboxUI();
+}
 
-        // Update Live if Open
-        const lens = document.getElementById('magnifier-lens');
-        if (lens) {
-            lens.style.width = magSettings.size + 'px';
-            lens.style.height = magSettings.size + 'px';
+function setupPanZoom() {
+    const container = document.getElementById('lightbox-container');
+    const img = document.getElementById('lightbox-img');
+
+    if (!container || !img) return;
+
+    // Wheel Zoom
+    container.addEventListener('wheel', (e) => {
+        e.preventDefault();
+
+        const xs = (e.clientX - lightboxState.pointX) / lightboxState.scale;
+        const ys = (e.clientY - lightboxState.pointY) / lightboxState.scale;
+
+        const delta = -Math.sign(e.deltaY);
+        // Smoother zoom step
+        const step = 0.15;
+
+        let newScale = lightboxState.scale + (delta * step * lightboxState.scale);
+        if (newScale < 0.5) newScale = 0.5;
+        if (newScale > 10) newScale = 10;
+
+        lightboxState.pointX = e.clientX - xs * newScale;
+        lightboxState.pointY = e.clientY - ys * newScale;
+        lightboxState.scale = newScale;
+
+        updateLightboxUI();
+    });
+
+    // Panning
+    img.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        lightboxState.panning = true;
+        lightboxState.startX = e.clientX - lightboxState.pointX;
+        lightboxState.startY = e.clientY - lightboxState.pointY;
+        img.style.cursor = 'grabbing';
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        if (!lightboxState.panning) return;
+        e.preventDefault();
+        lightboxState.pointX = e.clientX - lightboxState.startX;
+        lightboxState.pointY = e.clientY - lightboxState.startY;
+        updateLightboxUI();
+    });
+
+    window.addEventListener('mouseup', () => {
+        if (lightboxState.panning) {
+            lightboxState.panning = false;
+            img.style.cursor = 'grab';
         }
-    }
+    });
 }
 
 function closeImageLightbox() {
     const lightbox = document.getElementById('lightbox-modal');
     if (lightbox) {
         const img = document.getElementById('lightbox-img');
-        img.classList.remove('scale-100');
-        img.classList.add('scale-95');
+        // Reset scale animation
+        img.style.transform = 'scale(0.95)';
         setTimeout(() => {
             lightbox.classList.add('hidden');
             img.src = ''; // Clear to stop loading
-            const lens = document.getElementById('magnifier-lens');
-            if (lens) lens.style.backgroundImage = '';
         }, 200);
     }
 }
 
-function setupMagnifier() {
-    const container = document.getElementById('lightbox-container');
-    const img = document.getElementById('lightbox-img');
-    const lens = document.getElementById('magnifier-lens');
-    const zoomLevel = 2.5;
 
-    if (!container || !img || !lens) return;
-
-    container.addEventListener('mousemove', (e) => {
-        if (!img.complete || img.naturalWidth === 0) return;
-        const rect = img.getBoundingClientRect();
-        let x = e.clientX - rect.left;
-        let y = e.clientY - rect.top;
-
-        if (x < 0 || x > rect.width || y < 0 || y > rect.height) {
-            lens.classList.add('hidden');
-            return;
-        }
-        lens.classList.remove('hidden');
-
-        const lensW = lens.offsetWidth / 2;
-        const lensH = lens.offsetHeight / 2;
-        lens.style.left = (x - lensW) + 'px';
-        lens.style.top = (y - lensH) + 'px';
-
-        const xPerc = x / rect.width;
-        const yPerc = y / rect.height;
-        lens.style.backgroundSize = (rect.width * zoomLevel) + 'px ' + (rect.height * zoomLevel) + 'px';
-
-        const bgX = (xPerc * (rect.width * zoomLevel)) - lensW;
-        const bgY = (yPerc * (rect.height * zoomLevel)) - lensH;
-        lens.style.backgroundPosition = `-${bgX}px -${bgY}px`;
-    });
-
-    container.addEventListener('mouseleave', () => {
-        lens.classList.add('hidden');
-    });
-}
 
 // --- Paste Handlers ---
 async function handleImagePaste(e) {
