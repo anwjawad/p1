@@ -1113,6 +1113,18 @@ function renderModalLabs(labs) {
         };
         container.appendChild(addBtn);
 
+        // --- Render Image Section ---
+        // Find or Create Image Container below grid
+        let imgContainer = document.getElementById('modal-lab-images');
+        if (!imgContainer) {
+            imgContainer = document.createElement('div');
+            imgContainer.id = 'modal-lab-images';
+            imgContainer.className = "mt-6 pt-6 border-t border-slate-100";
+            // Insert after labs grid
+            container.parentNode.appendChild(imgContainer);
+        }
+        renderLabImages();
+
     } catch (err) {
         console.error("Critical renderModalLabs error:", err);
         alert("UI Error: " + err.message);
@@ -3942,3 +3954,237 @@ loadHistoryIndex();
 setTimeout(() => {
     if (appData.historyIndex.ids.size === 0) console.log("System V2 Loaded - Index Empty (Wait for fetch)");
 }, 2000);
+
+// --- Image Upload Logic ---
+
+function renderLabImages() {
+    const container = document.getElementById('modal-lab-images');
+    if (!container) return; // Should exist if modal matches structure
+
+    container.innerHTML = '';
+
+    const images = appData.currentPatient.labImages || [];
+
+    // Grid of Images
+    if (images.length > 0) {
+        const grid = document.createElement('div');
+        grid.className = "grid grid-cols-2 md:grid-cols-4 gap-4 mb-4";
+
+        images.forEach((img, idx) => {
+            const card = document.createElement('div');
+            card.className = "relative group rounded-lg overflow-hidden border border-slate-200 shadow-sm bg-white cursor-pointer hover:shadow-md transition-all";
+
+            // Use 'thumbnail' endpoint for reliable preview, fall back to direct ID
+            const thumbUrl = `https://drive.google.com/thumbnail?id=${img.id}&sz=w800`;
+            // USE THUMBNAIL ENDPOINT FOR FULL VIEW TOO (More reliable than uc?export=view)
+            const fullUrl = `https://drive.google.com/thumbnail?id=${img.id}&sz=w3000`; // Request huge size for lightbox
+
+            card.innerHTML = `
+                <div class="aspect-video bg-slate-100 flex items-center justify-center overflow-hidden">
+                    <img src="${thumbUrl}" class="w-full h-full object-cover transition-transform group-hover:scale-105" 
+                         onerror="this.src='https://placehold.co/600x400?text=Scan+QR+to+View'; this.onerror=null;" 
+                         alt="Lab Image">
+                </div>
+                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                    <button class="p-3 bg-white rounded-full text-slate-800 hover:text-blue-600 shadow-lg btn-view-img transform hover:scale-110 transition-transform" title="View">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                    <button class="p-3 bg-white rounded-full text-slate-800 hover:text-red-600 shadow-lg btn-delete-img transform hover:scale-110 transition-transform" title="Delete">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            `;
+
+            // View Lightbox
+            card.querySelector('.btn-view-img').onclick = (e) => {
+                e.stopPropagation();
+                openImageLightbox(fullUrl);
+            };
+
+            // Also click on card opens lightbox
+            card.onclick = () => openImageLightbox(fullUrl);
+
+
+            // Delete Logic
+            card.querySelector('.btn-delete-img').onclick = (e) => {
+                e.stopPropagation();
+                if (confirm("Remove this image?")) {
+                    images.splice(idx, 1);
+                    appData.currentPatient.labImages = images;
+                    triggerSave();
+                    renderLabImages();
+                }
+            };
+
+            container.appendChild(card);
+        });
+
+        container.appendChild(grid);
+    }
+
+    // Paste/Upload Area
+    const uploadArea = document.createElement('div');
+    uploadArea.id = "paste-area";
+    uploadArea.className = "border-2 border-dashed border-slate-300 rounded-xl p-8 flex flex-col items-center justify-center text-slate-400 bg-slate-50 hover:bg-slate-100 hover:border-medical-400 hover:text-medical-600 transition-all cursor-pointer relative group text-center";
+    uploadArea.tabIndex = 0; // Make focusable
+
+    // Hidden File Input for Mobile/Click Support
+    const textDesc = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? "Tap to Upload Image" : "Paste or Click to Upload";
+
+    uploadArea.innerHTML = `
+        <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform text-2xl">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+        </div>
+        <h4 class="font-bold text-sm uppercase tracking-wider">${textDesc}</h4>
+        <p class="text-[10px] opacity-70 mb-0 hidden md:block">(Ctrl+V or Click)</p>
+        <input type="file" id="img-file-input" accept="image/*" class="hidden">
+        
+        <div id="upload-status" class="absolute inset-0 bg-white/90 backdrop-blur-sm flex items-center justify-center text-medical-600 font-bold hidden z-10 flex-col">
+            <i class="fa-solid fa-circle-notch fa-spin text-2xl mb-2"></i> 
+            <span>Uploading...</span>
+        </div>
+    `;
+
+    // Event: Paste (Desktop)
+    uploadArea.addEventListener('paste', handleImagePaste);
+
+    // Event: Click (Mobile/Desktop File Picker)
+    uploadArea.onclick = (e) => {
+        if (e.target.id !== 'img-file-input') {
+            document.getElementById('img-file-input').click();
+        }
+    };
+
+    // Event: File Selected
+    setTimeout(() => {
+        const fileInp = document.getElementById('img-file-input');
+        if (fileInp) {
+            fileInp.onchange = (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    uploadImage(e.target.files[0]);
+                }
+            };
+        }
+    }, 0);
+
+    container.appendChild(uploadArea);
+}
+
+// --- Lightbox Logic ---
+function openImageLightbox(url) {
+    // Check if lightbox exists
+    let lightbox = document.getElementById('lightbox-modal');
+    if (!lightbox) {
+        lightbox = document.createElement('div');
+        lightbox.id = 'lightbox-modal';
+        lightbox.className = 'fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center animate-fade-in hidden';
+        lightbox.innerHTML = `
+            <button onclick="closeImageLightbox()" class="absolute top-4 right-4 text-white/50 hover:text-white transition-colors z-20">
+                <i class="fa-solid fa-times text-4xl"></i>
+            </button>
+            <img id="lightbox-img" src="" class="max-w-[95vw] max-h-[95vh] object-contain shadow-2xl rounded-sm transform transition-transform duration-300 scale-95" />
+        `;
+        // Close on background click
+        lightbox.onclick = (e) => {
+            if (e.target === lightbox) closeImageLightbox();
+        };
+        document.body.appendChild(lightbox);
+    }
+
+    const img = document.getElementById('lightbox-img');
+    img.src = url;
+
+    lightbox.classList.remove('hidden');
+    // Animate in
+    requestAnimationFrame(() => {
+        img.classList.remove('scale-95');
+        img.classList.add('scale-100');
+    });
+}
+
+function closeImageLightbox() {
+    const lightbox = document.getElementById('lightbox-modal');
+    if (lightbox) {
+        const img = document.getElementById('lightbox-img');
+        img.classList.remove('scale-100');
+        img.classList.add('scale-95');
+        setTimeout(() => {
+            lightbox.classList.add('hidden');
+            img.src = ''; // Clear to stop loading
+        }, 200);
+    }
+}
+
+// --- Paste Handlers ---
+async function handleImagePaste(e) {
+    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    let file = null;
+
+    // Find image in clipboard
+    for (let item of items) {
+        if (item.type.indexOf("image") === 0) {
+            file = item.getAsFile();
+            break;
+        }
+    }
+
+    if (!file) return; // Not an image paste
+
+    e.preventDefault();
+
+    // Valid Image found
+    uploadImage(file);
+}
+
+function uploadImage(file) {
+    const status = document.getElementById('upload-status');
+    if (status) status.classList.remove('hidden');
+
+    uploadFileToBackend(file);
+}
+
+async function uploadFileToBackend(file) {
+    const status = document.getElementById('upload-status');
+    if (status) status.classList.remove('hidden');
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = async () => {
+        const base64 = reader.result;
+
+        try {
+            // Use standard fetch (awaiting CORS headers from GAS)
+            const res = await fetch(GAS_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // text/plain avoids OPTIONS postflight
+                body: JSON.stringify({
+                    action: 'upload_image',
+                    image: base64, // Full data URI
+                    filename: 'paste_' + Date.now() + '.png'
+                })
+            });
+
+            const json = await res.json();
+
+            if (json.status === 'success') {
+                if (!appData.currentPatient.labImages) appData.currentPatient.labImages = [];
+                appData.currentPatient.labImages.push({
+                    url: json.url,
+                    id: json.fileId, // Use ID for reliable thumbnail
+                    name: json.name
+                });
+
+                triggerSave();
+                renderLabImages();
+            } else {
+                alert("Upload failed: " + (json.error || json.message));
+            }
+
+        } catch (e) {
+            console.error(e);
+            alert("Upload Error. Please check your internet or Script deployment.");
+        } finally {
+            if (status) status.classList.add('hidden');
+        }
+    };
+}
