@@ -808,17 +808,41 @@
             </div>
 
             <div class="p-4 md:p-6 space-y-6 md:space-y-8">
-                <!-- Labs Section (Horizontal Scroll) -->
-                <section>
-                    <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wide mb-3 flex items-center gap-2">
-                        <i class="fa-solid fa-flask text-medical-600"></i> Critical Labs
-                    </h3>
-                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="modal-labs-grid">
-                        <!-- Lab items -->
-                    </div>
-                </section>
+                <!-- Smart Action Row (Labs & Symptoms) -->
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <button onclick="openLabsModal(appData.currentPatient)"
+                        class="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:border-blue-300 transition-all group">
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                <i class="fa-solid fa-flask text-lg"></i>
+                            </div>
+                            <div class="text-left">
+                                <h4 class="font-bold text-slate-700 text-sm">Critical Labs</h4>
+                                <p class="text-xs text-slate-400">View logs or upload</p>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-slate-300"></i>
+                    </button>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                    <button onclick="openSymptomsModal(appData.currentPatient)"
+                        class="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:border-rose-300 transition-all group">
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="w-10 h-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center group-hover:bg-rose-600 group-hover:text-white transition-colors">
+                                <i class="fa-solid fa-notes-medical text-lg"></i>
+                            </div>
+                            <div class="text-left">
+                                <h4 class="font-bold text-slate-700 text-sm">Symptoms</h4>
+                                <p class="text-xs text-slate-400">Assess & Record</p>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-slate-300"></i>
+                    </button>
+                </div>
+
+                <!-- Diagnosis & Provider (Restored) -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6">
                     <div>
                         <label class="block text-xs font-medium text-slate-500 uppercase mb-1">Diagnosis</label>
                         <input id="inp-diagnosis" type="text"
@@ -836,16 +860,6 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- Symptoms -->
-                <section>
-                    <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wide mb-3 flex items-center gap-2">
-                        <i class="fa-solid fa-notes-medical text-rose-500"></i> Symptoms Assessment
-                    </h3>
-                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2" id="modal-symptoms-grid">
-                        <!-- Symptom Buttons -->
-                    </div>
-                </section>
 
                 <!-- Active Plan Display Section -->
                 <section id="modal-plan-section" class="hidden">
@@ -1415,6 +1429,72 @@
         </div>
     </div>
 
+    <!-- Symptoms Assessment Modal -->
+    <div id="symptoms-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center fade-in">
+        <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="closeSymptomsModal()"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 my-6 flex flex-col max-h-[90vh]">
+
+            <!-- Header -->
+            <div class="px-6 py-4 border-b border-rose-100 flex justify-between items-center bg-rose-50 rounded-t-2xl">
+                <div>
+                    <h3 class="font-bold text-xl text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-notes-medical text-rose-500"></i> Symptoms Assessment
+                    </h3>
+                    <p class="text-xs text-rose-600/70 font-semibold" id="sys-patient-name">Patient Name</p>
+                </div>
+                <button onclick="closeSymptomsModal()"
+                    class="w-8 h-8 rounded-full bg-white text-slate-400 hover:text-rose-600 shadow-sm flex items-center justify-center transition-colors">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Content -->
+            <div class="flex-1 overflow-y-auto p-6 space-y-6">
+
+                <!-- Active Symptoms List -->
+                <section>
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Active Symptoms</h4>
+                    <div id="sys-active-list" class="space-y-3">
+                        <!-- Injected via JS -->
+                        <div class="text-center text-slate-400 text-sm py-4 italic">No active symptoms reported.</div>
+                    </div>
+                </section>
+
+                <!-- Quick Add Grid -->
+                <section>
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Quick Add</h4>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" id="sys-quick-add">
+                        <!-- Buttons injected via JS -->
+                    </div>
+                </section>
+
+                <!-- Custom Add -->
+                <section>
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Add Custom</h4>
+                    <div class="flex gap-2">
+                        <input type="text" id="sys-custom-input"
+                            class="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 outline-none"
+                            placeholder="e.g. Hiccups">
+                        <button onclick="addCustomSymptom()"
+                            class="px-4 py-2 bg-slate-800 text-white text-sm font-bold rounded-lg hover:bg-slate-700">Add</button>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- Footer -->
+            <div
+                class="px-6 py-4 border-t border-slate-100 bg-white rounded-b-2xl flex justify-end gap-3 transition-colors">
+                <button onclick="closeSymptomsModal()"
+                    class="px-4 py-2 text-slate-500 font-bold hover:bg-slate-50 rounded-lg">Cancel</button>
+                <button onclick="saveSymptomsData()"
+                    class="px-6 py-2 bg-rose-600 text-white font-bold rounded-lg hover:bg-rose-700 shadow-lg shadow-rose-200 flex items-center gap-2">
+                    <i class="fa-solid fa-check"></i> Save Assessment
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- AI Command Center Modal -->
     <div id="ai-hub-modal" class="fixed inset-0 z-[80] hidden">
         <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onclick="closeAIHub()"></div>
@@ -1736,6 +1816,98 @@
     <script src="js/patient-renderer.js?v=1"></script>
     <!-- Main Logic -->
     <script src="js/main.js?v=5"></script>
+
+    <!-- Labs Modal (New) -->
+    <div id="labs-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center fade-in">
+        <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-md" onclick="closeLabsModal()"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-5xl mx-4 my-6 flex flex-col max-h-[90vh]">
+
+            <!-- Header -->
+            <div class="px-6 py-4 border-b border-blue-100 flex justify-between items-center bg-blue-50 rounded-t-2xl">
+                <div>
+                    <h3 class="font-bold text-xl text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-flask text-blue-600"></i> Critical Labs
+                    </h3>
+                    <p class="text-xs text-blue-600/70 font-semibold" id="lab-patient-name">Patient Name</p>
+                </div>
+
+                <!-- View Toggle Buttons -->
+                <div class="bg-white rounded-lg p-1 border border-blue-100 shadow-sm flex gap-1">
+                    <button onclick="switchLabsView('image')" id="btn-labs-view-image"
+                        class="px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-2">
+                        <i class="fa-solid fa-image"></i> Image
+                    </button>
+                    <button onclick="switchLabsView('manual')" id="btn-labs-view-manual"
+                        class="px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-2">
+                        <i class="fa-solid fa-keyboard"></i> Manual
+                    </button>
+                </div>
+
+                <button onclick="closeLabsModal()"
+                    class="w-8 h-8 rounded-full bg-white text-slate-400 hover:text-blue-600 shadow-sm flex items-center justify-center transition-colors">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Content: Image View -->
+            <div id="labs-view-image"
+                class="flex-1 overflow-y-auto p-6 flex flex-col items-center justify-center min-h-[400px]">
+
+                <div class="text-center w-full max-w-lg">
+                    <!-- Click/Paste Target -->
+                    <!-- Click/Paste Target -->
+                    <div id="labs-paste-target"
+                        class="border-2 border-dashed border-slate-300 rounded-2xl bg-slate-50 p-10 cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-all group relative mb-6"
+                        onclick="document.getElementById('labs-upload-input-v2').click()" tabindex="0">
+                        <div class="space-y-4">
+                            <div
+                                class="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center mx-auto text-slate-400 group-hover:text-blue-500 transition-colors">
+                                <i class="fa-solid fa-cloud-arrow-up text-3xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-slate-700 text-lg">Click to Upload</h3>
+                                <p class="text-slate-500 text-sm">or Ctrl+V to Paste Image</p>
+                            </div>
+                        </div>
+                    </div>
+                    <input type="file" id="labs-upload-input-v2" class="hidden" accept="image/*"
+                        onchange="handleLabsImageUpload(this.files[0])">
+
+                    <!-- Recent Images Previews (Simple List) -->
+                    <div id="labs-recent-list" class="grid grid-cols-4 gap-2">
+                        <!-- Preview Images -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content: Manual View -->
+            <div id="labs-view-manual" class="hidden flex-1 overflow-y-auto p-6 bg-slate-50/50">
+                <div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3" id="labs-manual-grid">
+                    <!-- Injected Inputs -->
+                </div>
+
+                <!-- Corrected Calcium Helper -->
+                <div class="mt-6 flex justify-start">
+                    <button onclick="toggleCalc()"
+                        class="px-4 py-2 bg-indigo-50 text-indigo-700 font-bold rounded-xl border border-indigo-100 hover:bg-indigo-100 shadow-sm flex items-center gap-2">
+                        <i class="fa-solid fa-calculator"></i> Corrected Calcium
+                    </button>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div
+                class="px-6 py-4 border-t border-slate-100 bg-white rounded-b-2xl flex justify-end gap-3 transition-colors">
+                <button onclick="closeLabsModal()"
+                    class="px-4 py-2 text-slate-500 font-bold hover:bg-slate-50 rounded-lg">Close</button>
+                <button onclick="saveLabsData()"
+                    class="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-lg shadow-blue-200 flex items-center gap-2">
+                    <i class="fa-solid fa-check"></i> Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- History / Archive Modal -->
     <div id="history-modal" class="fixed inset-0 z-[70] hidden flex items-center justify-center fade-in">
         <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="closeHistoryModal()"></div>

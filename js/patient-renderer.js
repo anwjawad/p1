@@ -211,6 +211,9 @@ function renderPatientsGrid(patients) {
                     <button class="w-8 h-8 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white flex items-center justify-center transition-colors btn-view-labs" title="View Labs">
                         <i class="fa-solid fa-flask"></i>
                     </button>` : ''}
+                    <button class="w-8 h-8 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-colors btn-symptoms" title="Symptoms Assessment">
+                        <i class="fa-solid fa-notes-medical"></i>
+                    </button>
                     <button class="w-8 h-8 rounded-full bg-violet-50 text-violet-600 hover:bg-violet-600 hover:text-white flex items-center justify-center transition-colors btn-plan" title="Plan">
                         <i class="fa-solid fa-list-check"></i>
                     </button>
@@ -239,6 +242,14 @@ function renderPatientsGrid(patients) {
                     if (typeof openPlanModal === 'function') openPlanModal(p);
                 };
             }
+            // Attach event listener for Symptoms
+            const symBtn = card.querySelector('.btn-symptoms');
+            if (symBtn) {
+                symBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (typeof openSymptomsModal === 'function') openSymptomsModal(p);
+                };
+            }
             // Attach event listener for View Labs
             const labsBtn = card.querySelector('.btn-view-labs');
             if (labsBtn) {
@@ -247,11 +258,10 @@ function renderPatientsGrid(patients) {
                     // Open the LAST image (most recent)
                     if (p.labImages && p.labImages.length > 0) {
                         const lastImg = p.labImages[p.labImages.length - 1];
-                        // Use the high-res thumbnail logic for lightbox if available, or just the URL logic we used in main.js
-                        // Since openImageLightbox logic is in main.js and handles the URL, we can just pass the ID if we refactor,
-                        // but main.js's openImageLightbox expects a URL.
-                        // Let's manually construct the reliable URL here to match main.js logic
-                        const robustUrl = `https://drive.google.com/thumbnail?id=${lastImg.id}&sz=w3000`;
+                        // Use the local URL (Base64) if valid, otherwise fallback to Drive ID logic
+                        const robustUrl = (lastImg.url && lastImg.url.length > 50)
+                            ? lastImg.url
+                            : `https://drive.google.com/thumbnail?id=${lastImg.id}&sz=w3000`;
 
                         if (typeof openImageLightbox === 'function') {
                             openImageLightbox(robustUrl);

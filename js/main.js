@@ -1,4 +1,4 @@
-
+﻿
 // --------------------------------------------------------
 // CONFIGURATION
 // --------------------------------------------------------
@@ -229,8 +229,10 @@ async function fetchData() {
         if (appData.currentWard && wardKeys.includes(appData.currentWard)) {
             selectWard(appData.currentWard);
         } else {
-            const firstWard = wardKeys[0];
-            if (firstWard) selectWard(firstWard);
+            // Find first ward with patients
+            const populatedWard = wardKeys.find(key => appData.wards[key] && appData.wards[key].length > 0);
+            const target = populatedWard || wardKeys[0];
+            if (target) selectWard(target);
         }
 
     } catch (e) {
@@ -665,9 +667,6 @@ function openModal(patient) {
     // Smart Paste for PRN Meds
     document.getElementById('inp-medications-prn').addEventListener('paste', handlePrnPaste);
 
-    renderModalLabs(patient.labs || {});
-    renderModalSymptoms(patient.symptoms || {});
-
     modal.classList.remove('hidden');
     setTimeout(() => { panel.classList.remove('translate-x-full'); }, 10);
 }
@@ -975,9 +974,9 @@ function renderModalLabs(labs) {
             if (val !== '') {
                 const num = parseFloat(val);
                 if (!isNaN(num)) {
-                    if (num < min) { statusClass = "text-blue-600 border-blue-400 bg-blue-50 font-bold"; statusIcon = "↓"; }
-                    else if (num > max) { statusClass = "text-red-600 border-red-400 bg-red-50 font-bold"; statusIcon = "↑"; }
-                    else { statusClass = "text-emerald-600 border-emerald-400 bg-emerald-50"; statusIcon = "✓"; }
+                    if (num < min) { statusClass = "text-blue-600 border-blue-400 bg-blue-50 font-bold"; statusIcon = "â†“"; }
+                    else if (num > max) { statusClass = "text-red-600 border-red-400 bg-red-50 font-bold"; statusIcon = "â†‘"; }
+                    else { statusClass = "text-emerald-600 border-emerald-400 bg-emerald-50"; statusIcon = "âœ“"; }
                 }
             }
 
@@ -1152,7 +1151,7 @@ function openCalciumCalculator() {
                 </button>
                 
                 <h3 class="text-xl font-bold text-slate-800 mb-1">Corrected Calcium</h3>
-                <p class="text-xs text-slate-500 mb-4">Formula: Serum Ca + 0.8 × (4 - Serum Alb)</p>
+                <p class="text-xs text-slate-500 mb-4">Formula: Serum Ca + 0.8 Ã— (4 - Serum Alb)</p>
 
                 <div class="space-y-4">
                     <div>
@@ -1993,7 +1992,7 @@ function calculateOpioid() {
 // DAILY ROUNDS LOGIC
 // --------------------------------------------------------
 async function triggerDailyReset() {
-    if (!confirm("⚠️ Are you sure you want to START A NEW DAY?\n\nThis will:\n1. Archive all current data to History Log.\n2. Reset Daily Symptoms & Labs for all patients.\n3. Keep Profiles & Meds intact.\n\nThis action cannot be undone from the app.")) {
+    if (!confirm("âš ï¸ Are you sure you want to START A NEW DAY?\n\nThis will:\n1. Archive all current data to History Log.\n2. Reset Daily Symptoms & Labs for all patients.\n3. Keep Profiles & Meds intact.\n\nThis action cannot be undone from the app.")) {
         return;
     }
 
@@ -2010,7 +2009,7 @@ async function triggerDailyReset() {
         const json = await res.json();
 
         if (json.status === 'success') {
-            alert(`✅ New Day Started Successfully!\n${json.archived_count} records archived.`);
+            alert(`âœ… New Day Started Successfully!\n${json.archived_count} records archived.`);
             closeSettingsModal();
             location.reload(); // Reload to fetch clear data
         } else {
@@ -2018,7 +2017,7 @@ async function triggerDailyReset() {
         }
 
     } catch (e) {
-        alert("❌ Error Starting New Day: " + e.message);
+        alert("âŒ Error Starting New Day: " + e.message);
         btn.innerHTML = originalText;
         btn.disabled = false;
     }
@@ -2691,7 +2690,7 @@ function renderResources(files) {
                 <div class="truncate">
                     <h4 class="font-bold text-slate-700 text-sm truncate" title="${file.name}">${file.name}</h4>
                     <p class="text-[10px] text-slate-400">
-                        ${(file.size / 1024).toFixed(0)} KB • 
+                        ${(file.size / 1024).toFixed(0)} KB â€¢ 
                         Updated: ${new Date(file.lastUpdated).toLocaleDateString()}
                     </p>
                 </div>
@@ -3907,12 +3906,12 @@ function testHistoryConnection() {
             if (idxJson.status === 'success') {
                 idxMsg += `IDs Found: ${idxJson.ids.length}\nCodes Found: ${idxJson.codes.length}\n`;
                 if (idxJson.ids.includes(testId) || idxJson.codes.includes(testId)) {
-                    idxMsg += "✅ THIS ID WAS FOUND IN INDEX (Badge should show!)\n";
+                    idxMsg += "âœ… THIS ID WAS FOUND IN INDEX (Badge should show!)\n";
                 } else {
-                    idxMsg += "⚠️ ID NOT IN INDEX (Badge will NOT show)\n";
+                    idxMsg += "âš ï¸ ID NOT IN INDEX (Badge will NOT show)\n";
                 }
             } else {
-                idxMsg += "❌ Index Fetch Failed (Backend Error)\n";
+                idxMsg += "âŒ Index Fetch Failed (Backend Error)\n";
             }
 
             console.log("Index Result:", idxJson);
@@ -3936,8 +3935,8 @@ function testHistoryConnection() {
                         msg += "CRITICAL: 'history' missing. Update Backend Code.\n";
                     } else {
                         msg += `History Records: ${json.history.length}\n`;
-                        if (json.history.length > 0) msg += "✅ Details Fetch Success.";
-                        else msg += "⚠️ Details Empty.";
+                        if (json.history.length > 0) msg += "âœ… Details Fetch Success.";
+                        else msg += "âš ï¸ Details Empty.";
                     }
 
                     alert(msg);
@@ -4133,7 +4132,7 @@ function updateLightboxUI() {
     const hint = document.getElementById('lightbox-hint');
 
     // Pan Mode
-    hint.textContent = "Scroll to Zoom • Drag to Pan";
+    hint.textContent = "Scroll to Zoom â€¢ Drag to Pan";
     img.style.cursor = lightboxState.panning ? 'grabbing' : 'grab';
 
     // Apply Transform
@@ -4236,6 +4235,8 @@ async function handleImagePaste(e) {
     uploadImage(file);
 }
 
+
+
 function uploadImage(file) {
     const status = document.getElementById('upload-status');
     if (status) status.classList.remove('hidden');
@@ -4288,3 +4289,397 @@ async function uploadFileToBackend(file) {
         }
     };
 }
+
+
+// --------------------------------------------------------
+// SYMPTOMS ASSESSMENT MODAL LOGIC
+// --------------------------------------------------------
+let tempSymptoms = {}; // Local state for the modal
+const COMMON_SYMPTOMS = [
+    'Pain', 'Nausea', 'Vomiting', 'Dyspnea', 'Constipation',
+    'Delirium', 'Agitation', 'Fatigue', 'Anorexia', 'Anxiety',
+    'Depression', 'Insomnia', 'Cough', 'Dry Mouth', 'Pruritus'
+];
+
+function openSymptomsModal(patient) {
+    if (!patient) return;
+    appData.currentPatient = patient; // Ensure context
+
+    // Parse Existing
+    tempSymptoms = {};
+    if (patient.symptoms) {
+        // Deep copy to avoid mutating direct reference until save
+        try {
+            const raw = (typeof patient.symptoms === 'string') ? JSON.parse(patient.symptoms) : patient.symptoms;
+            tempSymptoms = JSON.parse(JSON.stringify(raw));
+        } catch (e) {
+            console.warn("Error parsing symptoms", e);
+            tempSymptoms = {};
+        }
+    }
+
+    // UI Init
+    document.getElementById('sys-patient-name').textContent = patient.name;
+    document.getElementById('symptoms-modal').classList.remove('hidden');
+    renderSymptomsUI();
+}
+
+function closeSymptomsModal() {
+    document.getElementById('symptoms-modal').classList.add('hidden');
+}
+
+function renderSymptomsUI() {
+    const activeList = document.getElementById('sys-active-list');
+    const quickGrid = document.getElementById('sys-quick-add');
+
+    // 1. Render Active List
+    activeList.innerHTML = '';
+    const activeKeys = Object.keys(tempSymptoms).filter(k => tempSymptoms[k] && tempSymptoms[k].active);
+
+    if (activeKeys.length === 0) {
+        activeList.innerHTML = '<div class="text-center text-slate-400 text-sm py-4 italic">No active symptoms reported.</div>';
+    } else {
+        activeKeys.forEach(k => {
+            const item = tempSymptoms[k];
+            const div = document.createElement('div');
+            div.className = "flex items-start gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100 animate-entry";
+            div.innerHTML = `
+                <div class="w-10 h-10 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 font-bold text-lg">
+                    ${k.charAt(0)}
+                </div>
+                <div class="flex-1">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold text-slate-700">${k}</span>
+                        <button onclick="removeSymptom('${k}')" class="text-slate-400 hover:text-red-500 text-xs">
+                            <i class="fa-solid fa-trash"></i> Remove
+                        </button>
+                    </div>
+                    <input type="text" 
+                        oninput="updateSymptomNote('${k}', this.value)" 
+                        value="${item.note || ''}" 
+                        placeholder="Add note (severity, frequency...)" 
+                        class="w-full bg-white border border-slate-200 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-rose-400 outline-none">
+                </div>
+            `;
+            activeList.appendChild(div);
+        });
+    }
+
+    // 2. Render Quick Add (exclude already active)
+    quickGrid.innerHTML = '';
+    COMMON_SYMPTOMS.forEach(s => {
+        if (tempSymptoms[s] && tempSymptoms[s].active) return; // Skip if active
+
+        const btn = document.createElement('button');
+        btn.className = "p-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:border-rose-400 hover:text-rose-600 transition-colors truncate";
+        btn.textContent = s;
+        btn.onclick = () => addSymptom(s);
+        quickGrid.appendChild(btn);
+    });
+}
+
+function addSymptom(name) {
+    if (!tempSymptoms[name]) {
+        tempSymptoms[name] = { active: true, note: '' };
+    } else {
+        tempSymptoms[name].active = true;
+    }
+    renderSymptomsUI();
+}
+
+function addCustomSymptom() {
+    const input = document.getElementById('sys-custom-input');
+    const val = input.value.trim();
+    if (val) {
+        // Capitalize first letter
+        const name = val.charAt(0).toUpperCase() + val.slice(1);
+        addSymptom(name);
+        input.value = '';
+    }
+}
+
+function removeSymptom(name) {
+    if (tempSymptoms[name]) {
+        tempSymptoms[name].active = false;
+        renderSymptomsUI();
+    }
+}
+
+function updateSymptomNote(name, note) {
+    if (tempSymptoms[name]) {
+        tempSymptoms[name].note = note;
+    }
+}
+
+function saveSymptomsData() {
+    if (!appData.currentPatient) return;
+
+    // Direct Object Update (No Stringify needed for appData, but maybe for GAS?)
+    // Our sync mechanism usually saves valid JSON objects as Strings if the backend requires it, 
+    // OR if we are using the simple CSV mapping, it might need to check triggerSave logic.
+    // Assuming TriggerSave serializes efficiently or backend handles it.
+    // Based on `renderModalLabs`, logic seems to support JSON stored in column.
+
+    appData.currentPatient.symptoms = tempSymptoms;
+
+    // Update UI immediately
+    renderPatientsGrid(appData.wards[appData.currentWard]);
+
+    // Save
+    triggerSave();
+
+    closeSymptomsModal();
+}
+
+// --------------------------------------------------------
+// CRITICAL LABS MODAL LOGIC (Refactored)
+// --------------------------------------------------------
+let currentLabView = 'image'; // 'image' or 'manual'
+
+function openLabsModal(patient) {
+    if(!patient) return;
+    appData.currentPatient = patient;
+    document.getElementById('lab-patient-name').textContent = patient.name;
+    
+    // Default View
+    switchLabsView('image');
+    
+    // Setup Manual Grid (using existing logic repurposed)
+    renderNewLabsGrid(patient.labs);
+
+    // Load recent images
+    renderLabsRecentImages();
+
+    document.getElementById('labs-modal').classList.remove('hidden');
+
+    // Focus Image Paste Target
+    setTimeout(() => {
+        const target = document.getElementById('labs-paste-target');
+        if(target) target.focus();
+    }, 100);
+}
+
+function closeLabsModal() {
+    document.getElementById('labs-modal').classList.add('hidden');
+}
+
+function switchLabsView(view) {
+    currentLabView = view;
+    const btnImg = document.getElementById('btn-labs-view-image');
+    const btnMan = document.getElementById('btn-labs-view-manual');
+    const viewImg = document.getElementById('labs-view-image');
+    const viewMan = document.getElementById('labs-view-manual');
+
+    // Reset styles
+    if (btnImg) btnImg.className = "px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-2 text-slate-500 hover:bg-slate-50";
+    if (btnMan) btnMan.className = "px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-2 text-slate-500 hover:bg-slate-50";
+
+    if(view === 'image') {
+        if (btnImg) btnImg.className = "px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-2 bg-blue-100 text-blue-700";
+        if (viewImg) viewImg.classList.remove('hidden');
+        if (viewMan) viewMan.classList.add('hidden');
+        // Focus for paste
+        setTimeout(() => document.getElementById('labs-paste-target')?.focus(), 50);
+    } else {
+        if (btnMan) btnMan.className = "px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-2 bg-blue-100 text-blue-700";
+        if (viewMan) viewMan.classList.remove('hidden');
+        if (viewImg) viewImg.classList.add('hidden');
+    }
+}
+
+// Paste Handler for Labs (Image)
+document.addEventListener('paste', (e) => {
+    // Only if Labs Modal Image View is open
+    const modal = document.getElementById('labs-modal');
+    if (!modal || modal.classList.contains('hidden')) return;
+    if (currentLabView !== 'image') return;
+
+    // Check for image
+    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    let blob = null;
+    for (const item of items) {
+        if (item.type.indexOf('image') === 0) {
+            blob = item.getAsFile();
+            break;
+        }
+    }
+    if (blob) {
+        e.preventDefault();
+        handleLabsImageUpload(blob);
+    }
+});
+
+
+
+function renderLabsRecentImages() {
+    const list = document.getElementById('labs-recent-list');
+    if (!list) return;
+    list.innerHTML = '';
+    const images = appData.currentPatient.labImages || [];
+    
+    images.slice().reverse().forEach(img => {
+        const div = document.createElement('div');
+        div.className = "aspect-square rounded-lg border border-slate-200 bg-slate-100 overflow-hidden relative cursor-pointer group";
+        div.innerHTML = "<img src='" + img.url + "' class='w-full h-full object-cover'><div class='absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center'><i class='fa-solid fa-eye text-white opacity-0 group-hover:opacity-100 drop-shadow-md'></i></div>";
+        div.onclick = () => openImageLightbox(img.url); 
+        list.appendChild(div);
+    });
+}
+
+function renderNewLabsGrid(labs) {
+    const container = document.getElementById('labs-manual-grid');
+    if (!container) return;
+    container.innerHTML = '';
+
+    // Robust parsing for Labs
+    if (typeof labs === 'string') {
+        try { labs = JSON.parse(labs); } catch (e) { labs = {}; }
+    }
+    if (!labs || typeof labs !== 'object' || Array.isArray(labs)) {
+        labs = {};
+    }
+
+    const standardKeys = ["CL", "K", "NA", "TB", "DB", "ALB", "MG", "PH", "CA", "CRP", "SGOT", "SGPT", "ALP", "LDH", "SCR", "BUN", "WBC", "RBC", "HGB", "PLT"];
+    
+    standardKeys.forEach(key => {
+        const lData = labs[key] || { value: '', unit: '' };
+        const val = lData.value;
+        const range = appData.ranges[key] || [0,0];
+        const [min, max] = range;
+
+        // Status Logic
+        let statusClass = "text-slate-800 border-slate-300";
+        if (val) {
+            const num = parseFloat(val);
+            if (!isNaN(num)) {
+                if (num < min) statusClass = "text-blue-600 border-blue-400 font-bold bg-blue-50";
+                else if (num > max) statusClass = "text-red-600 border-red-400 font-bold bg-red-50";
+                else statusClass = "text-emerald-600 border-emerald-400 bg-emerald-50";
+            }
+        }
+
+        const div = document.createElement('div');
+        div.className = "p-3 rounded-xl border " + (val ? '' : 'border-slate-100') + " bg-white flex flex-col items-center justify-between h-24 hover:shadow-sm transition-all";
+        
+        div.innerHTML = "<label class='text-xs font-bold text-slate-400 uppercase'>" + key + "</label>" +
+            "<input type='text' value='" + (val || '') + "' " +
+                "class='w-full text-center bg-transparent text-lg font-bold focus:outline-none border-b border-transparent focus:border-blue-400 " + statusClass + "' " +
+                "onchange=\"updateLabValue('" + key + "', this.value)\">" +
+            "<span class='text-[9px] text-slate-300 font-mono'>" + min + "-" + max + "</span>";
+        container.appendChild(div);
+    });
+}
+
+function updateLabValue(key, value) {
+    if(!appData.currentPatient.labs) appData.currentPatient.labs = {};
+    // Ensure object type if previously string
+    if(typeof appData.currentPatient.labs === 'string') {
+        try {
+            appData.currentPatient.labs = JSON.parse(appData.currentPatient.labs);
+        } catch(e) { appData.currentPatient.labs = {}; }
+    }
+    
+    if(!appData.currentPatient.labs[key]) appData.currentPatient.labs[key] = {};
+    appData.currentPatient.labs[key].value = value;
+}
+
+function saveLabsData() {
+    triggerSave();
+    closeLabsModal();
+    renderPatientsGrid(appData.wards[appData.currentWard]); 
+}
+
+function toggleCalc() {
+    alert('Corrected Calcium formula coming soon.');
+}
+
+
+
+
+// ----------------------------------------------------------------------
+// HELPER: Simulate Backend Upload (Convert to DataURL for Local Usage)
+// ----------------------------------------------------------------------
+function uploadFileToBackend(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result); // Resolve with Data URL
+        reader.onerror = (e) => reject(e);
+        reader.readAsDataURL(file);
+    });
+}
+
+// ----------------------------------------------------------------------
+// LABS IMAGE HANDLER (Fixed)
+// ----------------------------------------------------------------------
+async function handleLabsImageUpload(file) {
+    if (!file) return;
+
+    const container = document.getElementById('labs-paste-target');
+    const originalContent = container ? container.innerHTML : '';
+
+    try {
+        // 1. Show Loading UI
+        if (container) {
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center py-10 animate-pulse">
+                    <i class="fa-solid fa-circle-notch fa-spin text-4xl text-blue-500 mb-3"></i>
+                    <p class="text-blue-600 font-bold">Processing Image...</p>
+                </div>`;
+        }
+
+        // 2. "Upload" (Convert to Base64)
+        const dataUrl = await uploadFileToBackend(file);
+
+        // 3. Store in AppData
+        if (!appData.currentPatient.labImages) appData.currentPatient.labImages = [];
+
+        // Add new image with timestamp
+        appData.currentPatient.labImages.push({
+            id: Date.now().toString(),
+            url: dataUrl,
+            date: new Date().toISOString()
+        });
+
+        // 4. Update Recent Images UI
+        renderLabsRecentImages();
+
+        // 5. Success Feedback / Reset
+        if (container) {
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center py-10 text-emerald-600 animate-entry">
+                    <i class="fa-solid fa-check-circle text-4xl mb-3"></i>
+                    <p class="font-bold">Upload Complete!</p>
+                </div>`;
+
+            // Restore original upload prompt after 1.5s
+            setTimeout(() => {
+                if (container) container.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center mx-auto text-slate-400 group-hover:text-blue-500 transition-colors">
+                            <i class="fa-solid fa-cloud-arrow-up text-3xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-700 text-lg">Click to Upload</h3>
+                            <p class="text-slate-500 text-sm">or Ctrl+V to Paste Image</p>
+                        </div>
+                    </div>`;
+             }, 1500);
+        }
+
+        // 6. Trigger background save
+        triggerSave();
+
+    } catch (error) {
+        console.error("Upload failed", error);
+        if(container) {
+            container.innerHTML = `
+                    < div class="flex flex-col items-center justify-center py-10 text-red-500" >
+                    <i class="fa-solid fa-triangle-exclamation text-4xl mb-3"></i>
+                    <p class="font-bold">Upload Failed</p>
+                    <button onclick="switchLabsView('image')" class="mt-2 text-xs underline">Try Again</button>
+                </div > `;
+        }
+    }
+}
+
+
