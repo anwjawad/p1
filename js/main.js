@@ -687,9 +687,6 @@ function handleRegularPaste(e) {
         if (cols.length < 3) return;
 
         // 1. Identify Status to filter out
-        // In sample: Status in last col (Pending...) OR Col 3 'dc'
-        // Let's Search for specific negative keywords in the whole row to be safe?
-        // Or assume last column is status.
         const fullRowStr = line.toLowerCase();
         if (fullRowStr.includes('discontinued') || fullRowStr.includes('canceled') || fullRowStr.includes('held')) return;
 
@@ -697,19 +694,20 @@ function handleRegularPaste(e) {
         if (cols[3] && cols[3].trim().toLowerCase() === 'dc') return;
 
         // 2. Identify Columns
-        // Sample: Col 0 = Name, Col 1 = Detail (Dose Freq Route)
-        // Check if Col 1 looks like detail (contains dose/freq)
-        let nameIndex = 0;
-        let detailIndex = 1;
+        let nameIndex = -1;
+        let detailIndex = -1;
 
-        // Validation: Does Col 1 have Freq or Route?
-        if (!freqRegex.test(cols[1]) && !routeRegex.test(cols[1])) {
-            // Maybe shifted? Try to find the Detail column
-            for (let i = 0; i < cols.length; i++) {
-                if (freqRegex.test(cols[i]) || routeRegex.test(cols[i])) {
+        // New Logic: Iterate through columns to find the first VALID Name + Detail pair
+        // We look for a column that looks like "Details" (Freq or Route)
+        // AND verify the column before it is not empty (The Name)
+        for (let i = 0; i < cols.length; i++) {
+            if (freqRegex.test(cols[i]) || routeRegex.test(cols[i])) {
+                // Potential Detail Column found at 'i'
+                // Check if we have a valid Name candidate at 'i-1'
+                if (i > 0 && cols[i - 1].trim()) {
                     detailIndex = i;
-                    nameIndex = i - 1; // Assume Name is before Detail
-                    break;
+                    nameIndex = i - 1;
+                    break; // Found the pair, stop searching
                 }
             }
         }
@@ -719,14 +717,7 @@ function handleRegularPaste(e) {
         const name = cols[nameIndex].trim();
         const details = cols[detailIndex] ? cols[detailIndex].trim() : '';
 
-        // 3. Format
-        // User wants: Name (Unique), Dose, Frequency.
-        // Details usually contains "40mg OD Sub-Q".
-        // Let's Clean Details: Keep strictly what we want? 
-        // Or just use the whole string as it usually has Dose + Freq + Route.
-        // "40mg OD PO" is perfect.
-
-        // Deduplicate
+        // 3. Deduplicate
         if (!processedMeds.has(name)) {
             processedMeds.set(name, `${name} ${details}`);
         }
@@ -4437,13 +4428,13 @@ function saveSymptomsData() {
 let currentLabView = 'image'; // 'image' or 'manual'
 
 function openLabsModal(patient) {
-    if(!patient) return;
+    if (!patient) return;
     appData.currentPatient = patient;
     document.getElementById('lab-patient-name').textContent = patient.name;
-    
+
     // Default View
     switchLabsView('image');
-    
+
     // Setup Manual Grid (using existing logic repurposed)
     renderNewLabsGrid(patient.labs);
 
@@ -4455,7 +4446,7 @@ function openLabsModal(patient) {
     // Focus Image Paste Target
     setTimeout(() => {
         const target = document.getElementById('labs-paste-target');
-        if(target) target.focus();
+        if (target) target.focus();
     }, 100);
 }
 
@@ -4474,7 +4465,7 @@ function switchLabsView(view) {
     if (btnImg) btnImg.className = "px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-2 text-slate-500 hover:bg-slate-50";
     if (btnMan) btnMan.className = "px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-2 text-slate-500 hover:bg-slate-50";
 
-    if(view === 'image') {
+    if (view === 'image') {
         if (btnImg) btnImg.className = "px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-2 bg-blue-100 text-blue-700";
         if (viewImg) viewImg.classList.remove('hidden');
         if (viewMan) viewMan.classList.add('hidden');
@@ -4516,12 +4507,12 @@ function renderLabsRecentImages() {
     if (!list) return;
     list.innerHTML = '';
     const images = appData.currentPatient.labImages || [];
-    
+
     images.slice().reverse().forEach(img => {
         const div = document.createElement('div');
         div.className = "aspect-square rounded-lg border border-slate-200 bg-slate-100 overflow-hidden relative cursor-pointer group";
         div.innerHTML = "<img src='" + img.url + "' class='w-full h-full object-cover'><div class='absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center'><i class='fa-solid fa-eye text-white opacity-0 group-hover:opacity-100 drop-shadow-md'></i></div>";
-        div.onclick = () => openImageLightbox(img.url); 
+        div.onclick = () => openImageLightbox(img.url);
         list.appendChild(div);
     });
 }
@@ -4540,11 +4531,11 @@ function renderNewLabsGrid(labs) {
     }
 
     const standardKeys = ["CL", "K", "NA", "TB", "DB", "ALB", "MG", "PH", "CA", "CRP", "SGOT", "SGPT", "ALP", "LDH", "SCR", "BUN", "WBC", "RBC", "HGB", "PLT"];
-    
+
     standardKeys.forEach(key => {
         const lData = labs[key] || { value: '', unit: '' };
         const val = lData.value;
-        const range = appData.ranges[key] || [0,0];
+        const range = appData.ranges[key] || [0, 0];
         const [min, max] = range;
 
         // Status Logic
@@ -4560,33 +4551,33 @@ function renderNewLabsGrid(labs) {
 
         const div = document.createElement('div');
         div.className = "p-3 rounded-xl border " + (val ? '' : 'border-slate-100') + " bg-white flex flex-col items-center justify-between h-24 hover:shadow-sm transition-all";
-        
+
         div.innerHTML = "<label class='text-xs font-bold text-slate-400 uppercase'>" + key + "</label>" +
             "<input type='text' value='" + (val || '') + "' " +
-                "class='w-full text-center bg-transparent text-lg font-bold focus:outline-none border-b border-transparent focus:border-blue-400 " + statusClass + "' " +
-                "onchange=\"updateLabValue('" + key + "', this.value)\">" +
+            "class='w-full text-center bg-transparent text-lg font-bold focus:outline-none border-b border-transparent focus:border-blue-400 " + statusClass + "' " +
+            "onchange=\"updateLabValue('" + key + "', this.value)\">" +
             "<span class='text-[9px] text-slate-300 font-mono'>" + min + "-" + max + "</span>";
         container.appendChild(div);
     });
 }
 
 function updateLabValue(key, value) {
-    if(!appData.currentPatient.labs) appData.currentPatient.labs = {};
+    if (!appData.currentPatient.labs) appData.currentPatient.labs = {};
     // Ensure object type if previously string
-    if(typeof appData.currentPatient.labs === 'string') {
+    if (typeof appData.currentPatient.labs === 'string') {
         try {
             appData.currentPatient.labs = JSON.parse(appData.currentPatient.labs);
-        } catch(e) { appData.currentPatient.labs = {}; }
+        } catch (e) { appData.currentPatient.labs = {}; }
     }
-    
-    if(!appData.currentPatient.labs[key]) appData.currentPatient.labs[key] = {};
+
+    if (!appData.currentPatient.labs[key]) appData.currentPatient.labs[key] = {};
     appData.currentPatient.labs[key].value = value;
 }
 
 function saveLabsData() {
     triggerSave();
     closeLabsModal();
-    renderPatientsGrid(appData.wards[appData.currentWard]); 
+    renderPatientsGrid(appData.wards[appData.currentWard]);
 }
 
 function toggleCalc() {
@@ -4663,7 +4654,7 @@ async function handleLabsImageUpload(file) {
                             <p class="text-slate-500 text-sm">or Ctrl+V to Paste Image</p>
                         </div>
                     </div>`;
-             }, 1500);
+            }, 1500);
         }
 
         // 6. Trigger background save
@@ -4671,7 +4662,7 @@ async function handleLabsImageUpload(file) {
 
     } catch (error) {
         console.error("Upload failed", error);
-        if(container) {
+        if (container) {
             container.innerHTML = `
                     < div class="flex flex-col items-center justify-center py-10 text-red-500" >
                     <i class="fa-solid fa-triangle-exclamation text-4xl mb-3"></i>
