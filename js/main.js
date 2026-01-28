@@ -2248,25 +2248,41 @@ function printMedications() {
         `;
 
         wardsToPrint[ward].forEach(p => {
-            // Parse Meds
+            // Parse Meds logic refactored to handle Objects vs Strings
             let regularMeds = [];
             let prnMeds = [];
+            let rawCounts = { reg: 0, prn: 0 };
 
             try {
-                if (p.medications && p.medications.trim().startsWith('{')) {
-                    const obj = JSON.parse(p.medications);
-                    if (obj.regular) regularMeds = obj.regular.split(/\n|,/).filter(m => m.trim());
-                    if (obj.prn) prnMeds = obj.prn.split(/\n|,/).filter(m => m.trim());
-                } else if (p.medications) {
-                    regularMeds = p.medications.split(/\n|,/).filter(m => m.trim());
+                let medSource = p.medications;
+
+                // If string that looks like JSON, parse it
+                if (typeof medSource === 'string' && medSource.trim().startsWith('{')) {
+                    try { medSource = JSON.parse(medSource); } catch (e) { }
                 }
+
+                // If it is now an object (either originally or after parse)
+                if (medSource && typeof medSource === 'object') {
+                    if (medSource.regular) {
+                        regularMeds = String(medSource.regular).split(/\n/).map(m => m.trim()).filter(m => m);
+                    }
+                    if (medSource.prn) {
+                        prnMeds = String(medSource.prn).split(/\n/).map(m => m.trim()).filter(m => m);
+                    }
+                }
+                // Fallback: simple string (legacy)
+                else if (typeof medSource === 'string' && medSource.trim().length > 0) {
+                    regularMeds = medSource.split(/\n/).map(m => m.trim()).filter(m => m);
+                }
+
             } catch (e) {
-                if (p.medications) regularMeds = [p.medications];
+                console.warn("Error parsing meds for print", p.name, e);
+                regularMeds = ["Error reading medications"];
             }
 
             const formatList = (list) => {
                 if (!list || list.length === 0) return '<span class="empty-note">- None -</span>';
-                return `<ul>${list.map(m => `<li>${m.trim()}</li>`).join('')}</ul>`;
+                return `<ul>${list.map(m => `<li>${String(m || '').trim()}</li>`).join('')}</ul>`;
             };
 
             printContent += `
@@ -4672,5 +4688,210 @@ async function handleLabsImageUpload(file) {
         }
     }
 }
+
+// ==========================================
+// INTEGRATION: External App Handoffs (HVC & PE)
+// ==========================================
+
+/**
+ * Builds the URL Query String from Patient Data
+ */
+function constructPatientQueryParams(p) {
+    if (!p) return '';
+    const params = new URLSearchParams();
+
+    // Core Data
+    if (p.name) params.append('name', p.name);
+    if (p.code) params.append('id', p.code); // Map 'code' to 'id' if target expects 'id'
+    if (p.age) params.append('age', p.age);
+    if (p.diagnosis) params.append('diagnosis', p.diagnosis);
+    if (p.ward) params.append('ward', p.ward);
+    if (p.room) params.append('room', p.room);
+
+    // Context
+    params.append('source', 'palliative_hub');
+    params.append('mode', 'new'); // Signal to open "New Record" mode
+
+    return params.toString();
+}
+
+
+
+// --------------------------------------------------------
+// INTEGRATION: Embedded Forms (HVC & PE)
+// --------------------------------------------------------
+
+// Config - Destination URLs
+const HVC_API_URL = "https://script.google.com/macros/s/AKfycbzKCvkaQ8sDBoYCTWd9K4Rt9L4MPK3p1llGZwDT5nd5E33NeRen1l973EtFQyI42FvQ/exec";
+const PE_API_URL = "https://script.google.com/macros/s/AKfycbwjwZcOtRy0SmgBZABxPVDE30NHD2y_Tfu8py5P_VmETiPZz07QHleM7vTQYWyaZQB2/exec";
+
+// --- Home Visit Logic ---
+
+function openHVCModal() {
+    if (!appData.currentPatient) return;
+    const p = appData.currentPatient;
+
+    // Pre-fill
+    document.getElementById('hvc-name').value = p.name || '';
+    document.getElementById('hvc-id').value = p.code || ''; // File Num
+    document.getElementById('hvc-age').value = p.age || '';
+    document.getElementById('hvc-diagnosis-detail').value = p.diagnosis || '';
+    document.getElementById('hvc-date-reg').valueAsDate = new Date();
+
+    // Show
+    const modal = document.getElementById('hvc-modal');
+    modal.classList.remove('hidden');
+}
+
+function closeHVCModal() {
+    document.getElementById('hvc-modal').classList.add('hidden');
+}
+
+async function submitHVCForm() {
+    const btn = document.querySelector('#hvc-modal button[onclick="submitHVCForm()"]');
+    const statusDiv = document.getElementById('hvc-status');
+
+    // UI Loading
+    btn.disabled = true;
+    btn.classList.add('opacity-50');
+    statusDiv.classList.remove('hidden');
+
+    // FIXED: Action must be 'register' to match Backend
+    const payload = {
+        action: 'register',
+        data: {
+            'Pt Name': document.getElementById('hvc-name').value,
+            'Pt file Num.': document.getElementById('hvc-id').value,
+            'Gender': document.getElementById('hvc-gender').value,
+            'Age': document.getElementById('hvc-age').value,
+            'phone No.': document.getElementById('hvc-phone').value,
+            'Social Status': document.getElementById('hvc-social').value,
+            'City/Area (Adress)': document.getElementById('hvc-city').value,
+            'Specific Home Address': document.getElementById('hvc-address').value,
+            'Hospital': document.getElementById('hvc-hospital').value,
+            'Primary Physician': document.getElementById('hvc-doctor').value,
+            'Diagnosis': document.getElementById('hvc-diagnosis-cat').value,
+            'Specific Diagnosis': document.getElementById('hvc-diagnosis-detail').value,
+            'Opioid?': document.getElementById('hvc-opioid').value,
+            'Priority': document.getElementById('hvc-priority').value,
+            'ECGO': document.getElementById('hvc-ecog').value,
+            'PPI': document.getElementById('hvc-ppi').value,
+            'PPS': document.getElementById('hvc-pps').value,
+            'Registration Date': document.getElementById('hvc-date-reg').value,
+            'Servival Status': 'Alive'
+        }
+    };
+
+    try {
+        await fetch(HVC_API_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        saveQuickPlan('referral', `Registered in HVC: ${payload.data['Pt Name']}`);
+        closeHVCModal();
+        alert("Patient registered in Home Visit system successfully!");
+
+    } catch (e) {
+        console.error("HVC Submit Error", e);
+        alert("Failed to submit to Home Visit App. Check console.");
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('opacity-50');
+        statusDiv.classList.add('hidden');
+    }
+}
+
+
+// --- Equipment Logic ---
+
+function openPEModal(requestedDevice = '') {
+    if (!appData.currentPatient) return;
+    const p = appData.currentPatient;
+
+    // Pre-fill
+    document.getElementById('pe-name').value = p.name || '';
+    document.getElementById('pe-id').value = p.code || '';
+    document.getElementById('pe-diagnosis').value = p.diagnosis || '';
+
+    if (requestedDevice) {
+        document.getElementById('pe-device').value = requestedDevice;
+    }
+
+    document.getElementById('pe-date-delivery').valueAsDate = new Date();
+
+    // Show
+    const modal = document.getElementById('pe-modal');
+    modal.classList.remove('hidden');
+}
+
+function closePEModal() {
+    document.getElementById('pe-modal').classList.add('hidden');
+}
+
+async function submitPEForm() {
+    const btn = document.querySelector('#pe-modal button[onclick="submitPEForm()"]');
+    const statusDiv = document.getElementById('pe-status-msg');
+
+    // UI Loading
+    btn.disabled = true;
+    btn.classList.add('opacity-50');
+    statusDiv.classList.remove('hidden');
+
+    // FIXED: Payload must match 'addTransaction' schema (flat structure, specific keys)
+    const payload = {
+        action: 'addTransaction',
+        patientName: document.getElementById('pe-name').value,
+        patientId: document.getElementById('pe-id').value,
+        diagnosis: document.getElementById('pe-diagnosis').value,
+        area: document.getElementById('pe-area').value,
+        contact: document.getElementById('pe-phone').value,
+        recipientName: document.getElementById('pe-recipient').value,
+        recipientId: document.getElementById('pe-recipient-id').value,
+        relationship: document.getElementById('pe-relationship').value,
+        device: document.getElementById('pe-device').value,
+        status: document.getElementById('pe-status').value, // 'Pending' | 'Delivered'
+        notes: document.getElementById('pe-notes').value,
+
+        // Defaults/Derivations
+        timestamp: new Date().toISOString(),
+        deviceNumber: '', // Not collected in form
+        type: 'New'       // Default to New request
+    };
+
+    try {
+        await fetch(PE_API_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        // 1. Save Local Plan
+        saveQuickPlan('equipment', `Requested Equipment: ${payload.device}`);
+
+        // 2. Close & Reset
+        closePEModal();
+        alert("Equipment record saved successfully!");
+
+    } catch (e) {
+        console.error("PE Submit Error", e);
+        alert("Failed to submit to Equipment App. Check console.");
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('opacity-50');
+        statusDiv.classList.add('hidden');
+    }
+}
+
+// Global Exports
+window.openHVCModal = openHVCModal;
+window.closeHVCModal = closeHVCModal;
+window.submitHVCForm = submitHVCForm;
+window.openPEModal = openPEModal;
+window.closePEModal = closePEModal;
+window.submitPEForm = submitPEForm;
 
 

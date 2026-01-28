@@ -1,11 +1,12 @@
 /**
- * Palliative Care Rounds - Robust Backend V5 (Syntax Fix)
+ * Palliative Care Rounds - Robust Backend V6 (Image Upload Support)
  */
 
 var SHEET_NAME = 'Patients';
 var METADATA_SHEET_NAME = 'Metadata'; // New Sheet for Settings/Sections
 var LOCK_WAIT_MS = 10000;
 var GEMINI_API_KEY = 'AIzaSyCgEFZD3ulhQYflQokknERqcHrTAerS-XA'; 
+var IMAGE_FOLDER_NAME = 'Palliative_Images'; // Folder for uploaded images
 
 // --- CORS Config ---
 function doOptions(e) {
@@ -72,6 +73,9 @@ function doPost(e) {
         case 'batch_update':
           result = handleBatchUpdate(data.updates);
           break;
+        case 'upload_image':
+          result = handleImageUpload(data.image, data.filename);
+          break;
         // AI Actions
         case 'generate_plan':
            result = handleGenerateDischargePlan(data.medications);
@@ -121,6 +125,49 @@ function doPost(e) {
   } else {
     return corsJsonResponse({ error: "Server busy (Lock Timeout), please try again." });
   }
+}
+
+// --- Image Handler ---
+
+function handleImageUpload(base64Data, filename) {
+  if (!base64Data) throw new Error("No image data provided");
+  
+  // 1. Get/Create Folder
+  var folders = DriveApp.getFoldersByName(IMAGE_FOLDER_NAME);
+  var folder;
+  if (folders.hasNext()) {
+    folder = folders.next();
+  } else {
+    folder = DriveApp.createFolder(IMAGE_FOLDER_NAME);
+    // Ensure folder is accessible if needed, but file permission handles it usually
+    folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  }
+  
+  // 2. Decode Base64
+  // Data usually comes as "data:image/png;base64,....." - strip metadata
+  var contentType = base64Data.split(';')[0].split(':')[1] || 'image/png';
+  var bytes = Utilities.base64Decode(base64Data.split(',')[1]);
+  var blob = Utilities.newBlob(bytes, contentType, filename || ('upload_' + Date.now() + '.png'));
+  
+  // 3. Create File
+  var file = folder.createFile(blob);
+  
+  // 4. Set Permissions (Crucial for Display in App)
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  
+  // 5. Return URL
+  // webContentLink is for download, thumbnailLink can be used for preview, 
+  // but a direct ID-based link is often best for <img> tags if permissions allow.
+  // https://drive.google.com/uc?export=view&id={fileId} is a common proxy trick
+  
+  var url = "https://drive.google.com/uc?export=view&id=" + file.getId();
+  
+  return { 
+    status: 'success', 
+    url: url, 
+    fileId: file.getId(),
+    name: file.getName()
+  };
 }
 
 // ... existing code ...
@@ -808,7 +855,7 @@ function getAllPatients() {
     var obj = {};
     headers.forEach(function(h, idx) {
       var val = row[idx];
-      if (h === 'labs' || h === 'symptoms' || h === 'history_labs' || h === 'history_symptoms' || (typeof val === 'string' && val.startsWith('{'))) {
+      if (h === 'labs' || h === 'symptoms' || h === 'history_labs' || h === 'history_symptoms' || h === 'labImages' || (typeof val === 'string' && val.startsWith('{'))) {
         try {
           val = JSON.parse(val);
         } catch (e) { }
@@ -836,7 +883,8 @@ function ensureHeaders(sheet) {
     'id', 'name', 'code', 'ward', 'room', 'age', 
     'diagnosis', 'provider', 'treatment', 'medications', 
     'notes', 'symptoms', 'labs', 'history_symptoms', 
-    'history_labs', 'last_updated', 'plan', 'is_highlighted'
+    'history_labs', 'last_updated', 'plan', 'is_highlighted',
+    'labImages' // New Column for Images
   ];
   
   var lastCol = sheet.getLastColumn();
@@ -861,4 +909,26 @@ function corsJsonResponse(data) {
   var output = JSON.stringify(data);
   return ContentService.createTextOutput(output)
     .setMimeType(ContentService.MimeType.JSON);
+}
+function authorizeDrive() {
+  DriveApp.getFiles(); 
+}
+/* 
+ * ⚠️ PERMISSION FORCER ⚠️
+ * Run this function ONCE in the editor to authorize everything.
+ */
+function forceAllPermissions() {
+  // 1. Google Drive (Read/Write/Create)
+  var testFile = DriveApp.createFile("temp_auth_check", "test");
+  var folder = DriveApp.getRootFolder();
+  testFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  testFile.setTrashed(true); // Clean up immediately
+  
+  // 2. Google Sheets
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // 3. Internet Access (for Gemini AI)
+  UrlFetchApp.fetch("https://www.google.com");
+  
+  console.log("✅ All Permissions are now Authorized!");
 }

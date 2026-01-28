@@ -1675,7 +1675,7 @@
 
             <div class="p-6 overflow-y-auto" id="plan-content-area">
                 <!-- GRID OF OPTIONS -->
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-4" id="plan-options-grid">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="plan-options-grid">
                     <button onclick="showPlanDetail('medication')"
                         class="flex flex-col items-center justify-center p-6 bg-white border border-slate-200 rounded-xl hover:border-indigo-500 hover:shadow-lg transition-all group">
                         <div
@@ -1692,6 +1692,16 @@
                             <i class="fa-solid fa-mask-ventilator"></i>
                         </div>
                         <span class="font-bold text-slate-700">Equipment</span>
+                    </button>
+
+                    <!-- NEW: Home Visit Button -->
+                    <button onclick="openHVCModal()"
+                        class="flex flex-col items-center justify-center p-6 bg-white border border-slate-200 rounded-xl hover:border-rose-500 hover:shadow-lg transition-all group">
+                        <div
+                            class="w-12 h-12 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center text-xl mb-3 group-hover:bg-rose-500 group-hover:text-white transition-colors">
+                            <i class="fa-solid fa-house-medical"></i>
+                        </div>
+                        <span class="font-bold text-slate-700">Home Visit</span>
                     </button>
 
                     <button onclick="saveQuickPlan('consult', 'Physiotherapy Consult')"
@@ -1722,7 +1732,7 @@
                     </button>
 
                     <button onclick="showPlanDetail('note')"
-                        class="flex flex-col items-center justify-center p-6 bg-white border border-slate-200 rounded-xl hover:border-slate-500 hover:shadow-lg transition-all group">
+                        class="col-span-2 md:col-span-1 flex flex-col items-center justify-center p-6 bg-white border border-slate-200 rounded-xl hover:border-slate-500 hover:shadow-lg transition-all group">
                         <div
                             class="w-12 h-12 rounded-full bg-slate-50 text-slate-500 flex items-center justify-center text-xl mb-3 group-hover:bg-slate-500 group-hover:text-white transition-colors">
                             <i class="fa-solid fa-note-sticky"></i>
@@ -1773,44 +1783,56 @@
                     <button onclick="resetPlanView()"
                         class="mb-4 text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center"><i
                             class="fa-solid fa-arrow-left mr-1"></i> Back</button>
-                    <h4 class="font-bold text-lg text-cyan-900 mb-4">Select Equipment</h4>
+                    <h4 class="font-bold text-lg text-cyan-900 mb-4">Request New Equipment</h4>
+                    <p class="text-xs text-slate-400 mb-4">Select device to open request form</p>
 
                     <div class="space-y-2">
-                        <button onclick="saveQuickPlan('equipment', 'O2 Generator')"
-                            class="w-full p-3 text-left bg-white border border-slate-200 rounded-lg font-medium hover:bg-cyan-50 hover:border-cyan-200">O2
-                            Generator</button>
-                        <button onclick="saveQuickPlan('equipment', 'Air Mattress')"
-                            class="w-full p-3 text-left bg-white border border-slate-200 rounded-lg font-medium hover:bg-cyan-50 hover:border-cyan-200">Air
-                            Mattress</button>
-                        <button onclick="saveQuickPlan('equipment', 'Suction Machine')"
-                            class="w-full p-3 text-left bg-white border border-slate-200 rounded-lg font-medium hover:bg-cyan-50 hover:border-cyan-200">Suction
-                            Machine</button>
-                        <button onclick="saveQuickPlan('equipment', 'Nebulizer')"
-                            class="w-full p-3 text-left bg-white border border-slate-200 rounded-lg font-medium hover:bg-cyan-50 hover:border-cyan-200">Nebulizer</button>
-                        <button onclick="saveQuickPlan('equipment', 'LDD')"
-                            class="w-full p-3 text-left bg-white border border-slate-200 rounded-lg font-medium hover:bg-cyan-50 hover:border-cyan-200">LDD
-                            (Syringe Driver)</button>
+                        <button onclick="openPEModal('O2 Generator')"
+                            class="w-full p-3 text-left bg-white border border-slate-200 rounded-lg font-medium hover:bg-cyan-50 hover:border-cyan-200 flex justify-between">
+                            <span>O2 Generator</span> <i class="fa-solid fa-chevron-right text-slate-300"></i>
+                        </button>
+                        <button onclick="openPEModal('Air Mattress')"
+                            class="w-full p-3 text-left bg-white border border-slate-200 rounded-lg font-medium hover:bg-cyan-50 hover:border-cyan-200 flex justify-between">
+                            <span>Air Mattress</span> <i class="fa-solid fa-chevron-right text-slate-300"></i>
+                        </button>
+                        <button onclick="openPEModal('Suction Machine')"
+                            class="w-full p-3 text-left bg-white border border-slate-200 rounded-lg font-medium hover:bg-cyan-50 hover:border-cyan-200 flex justify-between">
+                            <span>Suction Machine</span> <i class="fa-solid fa-chevron-right text-slate-300"></i>
+                        </button>
+                        <button onclick="openPEModal('Nebulizer')"
+                            class="w-full p-3 text-left bg-white border border-slate-200 rounded-lg font-medium hover:bg-cyan-50 hover:border-cyan-200 flex justify-between">
+                            <span>Nebulizer</span> <i class="fa-solid fa-chevron-right text-slate-300"></i>
+                        </button>
+                        <button onclick="openPEModal('LDD (Syringe Driver)')"
+                            class="w-full p-3 text-left bg-white border border-slate-200 rounded-lg font-medium hover:bg-cyan-50 hover:border-cyan-200 flex justify-between">
+                            <span>LDD (Syringe Driver)</span> <i class="fa-solid fa-chevron-right text-slate-300"></i>
+                        </button>
                     </div>
+                    <button onclick="handleEquipmentSelection('LDD (Syringe Driver)')"
+                        class="w-full p-3 text-left bg-white border border-slate-200 rounded-lg font-medium hover:bg-cyan-50 hover:border-cyan-200 flex justify-between">
+                        <span>LDD (Syringe Driver)</span> <i class="fa-solid fa-external-link-alt text-slate-300"></i>
+                    </button>
                 </div>
-
-                <!-- Generic Note Sub-View -->
-                <div id="plan-sub-note" class="hidden animate-entry">
-                    <button onclick="resetPlanView()"
-                        class="mb-4 text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center"><i
-                            class="fa-solid fa-arrow-left mr-1"></i> Back</button>
-                    <h4 class="font-bold text-lg text-slate-800 mb-4" id="plan-note-title">Add Note</h4>
-
-                    <textarea id="plan-note-text"
-                        class="w-full p-4 bg-white border border-slate-200 rounded-xl mb-4 focus:ring-2 focus:ring-slate-500 outline-none"
-                        rows="4" placeholder="Type your plan/consult details here..."></textarea>
-
-                    <button onclick="savePlanItem('note')"
-                        class="w-full py-3 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-700 shadow-lg">Save
-                        to Plan</button>
-                </div>
-
             </div>
+
+            <!-- Generic Note Sub-View -->
+            <div id="plan-sub-note" class="hidden animate-entry">
+                <button onclick="resetPlanView()"
+                    class="mb-4 text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center"><i
+                        class="fa-solid fa-arrow-left mr-1"></i> Back</button>
+                <h4 class="font-bold text-lg text-slate-800 mb-4" id="plan-note-title">Add Note</h4>
+
+                <textarea id="plan-note-text"
+                    class="w-full p-4 bg-white border border-slate-200 rounded-xl mb-4 focus:ring-2 focus:ring-slate-500 outline-none"
+                    rows="4" placeholder="Type your plan/consult details here..."></textarea>
+
+                <button onclick="savePlanItem('note')"
+                    class="w-full py-3 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-700 shadow-lg">Save
+                    to Plan</button>
+            </div>
+
         </div>
+    </div>
     </div>
     <!-- Code Splitting: Patient Renderer (Must load before main.js) -->
     <script src="js/patient-renderer.js?v=1"></script>
@@ -1972,6 +1994,381 @@
         </div>
     </div>
 
+
+    <!-- ========================================== -->
+    <!-- NEW: Home Visit Modal (HVC) -->
+    <!-- ========================================== -->
+    <div id="hvc-modal" class="fixed inset-0 z-[70] hidden flex items-center justify-center fade-in">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeHVCModal()"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-5xl mx-4 my-6 flex flex-col max-h-[90vh]">
+
+            <!-- Header -->
+            <div class="px-6 py-4 border-b border-rose-100 flex justify-between items-center bg-rose-50 rounded-t-2xl">
+                <div>
+                    <h3 class="font-bold text-xl text-slate-800"><i
+                            class="fa-solid fa-house-medical text-rose-500 mr-2"></i>New Home Visit Patient</h3>
+                    <p class="text-xs text-rose-600/70 font-semibold" id="hvc-header-subtitle">Register a new patient
+                        for home visit</p>
+                </div>
+                <button onclick="closeHVCModal()" class="text-slate-400 hover:text-rose-600 text-xl"><i
+                        class="fa-solid fa-times"></i></button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-6 bg-slate-50/50 space-y-8">
+
+                <!-- Section 1: Demographics -->
+                <section>
+                    <h4 class="text-sm font-bold text-slate-600 uppercase mb-4 flex items-center gap-2"><i
+                            class="fa-solid fa-address-card"></i> Demographics</h4>
+                    <div
+                        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">Patient Name</label>
+                            <input type="text" id="hvc-name"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">File Num / ID</label>
+                            <input type="text" id="hvc-id"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">Gender</label>
+                            <select id="hvc-gender"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white">
+                                <option value="">Select...</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">Age</label>
+                            <input type="number" id="hvc-age"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">Phone</label>
+                            <input type="text" id="hvc-phone"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">Social Status</label>
+                            <select id="hvc-social"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white">
+                                <option value="">Select...</option>
+                                <option value="Married">Married</option>
+                                <option value="Single">Single</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">City / Area</label>
+                            <select id="hvc-city"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white">
+                                <option value="">Select Area...</option>
+                                <option value="Hebron">Hebron</option>
+                                <option value="Jericho">Jericho</option>
+                                <option value="Jerusalem">Jerusalem</option>
+                                <option value="Bethlehem">Bethlehem</option>
+                                <option value="Ramallah">Ramallah</option>
+                                <option value="Nablus">Nablus</option>
+                                <option value="Jenin">Jenin</option>
+                                <option value="Tulkarm">Tulkarm</option>
+                                <option value="Qalqilya">Qalqilya</option>
+                                <option value="Salfit">Salfit</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1 md:col-span-2 lg:col-span-1">
+                            <label class="text-xs font-bold text-slate-500">Specific Address</label>
+                            <input type="text" id="hvc-address"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm">
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section 2: Clinical Info -->
+                <section>
+                    <h4 class="text-sm font-bold text-slate-600 uppercase mb-4 flex items-center gap-2"><i
+                            class="fa-solid fa-stethoscope"></i> Clinical Info</h4>
+                    <div
+                        class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">Hospital</label>
+                            <select id="hvc-hospital"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white">
+                                <option value="">Select...</option>
+                                <option value="AVH">AVH</option>
+                                <option value="Service">Service</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">Primary Physician</label>
+                            <select id="hvc-doctor"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white">
+                                <option value="">Select Doctor...</option>
+                                <option value="Amer Zughaier">Amer Zughaier</option>
+                                <option value="Bashir Abu Aqeel">Bashir Abu Aqeel</option>
+                                <option value="Fadel Rawashdeh">Fadel Rawashdeh</option>
+                                <option value="Fadi Al Atrash">Fadi Al Atrash</option>
+                                <option value="Farah Awad">Farah Awad</option>
+                                <option value="Hamdi Janazreh">Hamdi Janazreh</option>
+                                <option value="Hanna Qahoush">Hanna Qahoush</option>
+                                <option value="Ibraheem Eid">Ibraheem Eid</option>
+                                <option value="Jalal Qawasmi">Jalal Qawasmi</option>
+                                <option value="Moath Badawi">Moath Badawi</option>
+                                <option value="Ola Abu Laban">Ola Abu Laban</option>
+                                <option value="Salem Ballan">Salem Ballan</option>
+                                <option value="Waseem Sharabate">Waseem Sharabate</option>
+                                <option value="Yousef Hammamreh">Yousef Hammamreh</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">Diagnosis (Category)</label>
+                            <select id="hvc-diagnosis-cat"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white">
+                                <option value="">Select Diagnosis...</option>
+                                <option value="Brain Cancers">Brain Cancers</option>
+                                <option value="Breast Cancers">Breast Cancers</option>
+                                <option value="Colorectal cancers">Colorectal cancers</option>
+                                <option value="Endocrine Cancers">Endocrine Cancers</option>
+                                <option value="Gastric Cancers">Gastric Cancers</option>
+                                <option value="Genitourinary Cancers">Genitourinary Cancers</option>
+                                <option value="Gynecological Cancers">Gynecological Cancers</option>
+                                <option value="Head and Neck Cancers">Head and Neck Cancers</option>
+                                <option value="Hematological cancer">Hematological cancer</option>
+                                <option value="Lung Cancers">Lung Cancers</option>
+                                <option value="Lymphomas">Lymphomas</option>
+                                <option value="Panceriatic cancer">Panceriatic cancer</option>
+                                <option value="Prostate Cancers">Prostate Cancers</option>
+                                <option value="Rare and Mixed Cancers">Rare and Mixed Cancers</option>
+                                <option value="Sarcomas">Sarcomas</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1 md:col-span-2">
+                            <label class="text-xs font-bold text-slate-500">Specific Diagnosis</label>
+                            <input type="text" id="hvc-diagnosis-detail"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">Opioid?</label>
+                            <select id="hvc-opioid"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white">
+                                <option value="No">No</option>
+                                <option value="Yes">Yes</option>
+                            </select>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section 3: Status -->
+                <section>
+                    <h4 class="text-sm font-bold text-slate-600 uppercase mb-4 flex items-center gap-2"><i
+                            class="fa-solid fa-file-contract"></i> Status & Referral</h4>
+                    <div
+                        class="grid grid-cols-2 md:grid-cols-4 gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">Priority</label>
+                            <select id="hvc-priority"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white">
+                                <option value="">Select...</option>
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">ECOG</label>
+                            <input type="text" id="hvc-ecog"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">PPI</label>
+                            <input type="text" id="hvc-ppi"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">PPS</label>
+                            <input type="text" id="hvc-pps"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm">
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section 4: Dates -->
+                <section>
+                    <h4 class="text-sm font-bold text-slate-600 uppercase mb-4 flex items-center gap-2"><i
+                            class="fa-solid fa-calendar-days"></i> Dates</h4>
+                    <div
+                        class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">Registration</label>
+                            <input type="date" id="hvc-date-reg"
+                                class="w-full p-1 border border-slate-200 rounded text-xs">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">First Vist</label>
+                            <input type="date" id="hvc-date-v1"
+                                class="w-full p-1 border border-slate-200 rounded text-xs">
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+
+            <div class="px-6 py-4 border-t border-slate-100 bg-white rounded-b-2xl flex justify-end gap-3">
+                <div id="hvc-status" class="mr-auto text-sm font-bold text-slate-500 flex items-center hidden">
+                    <i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Sending to HVC App...
+                </div>
+                <button onclick="closeHVCModal()"
+                    class="px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-lg border border-transparent font-medium">Cancel</button>
+                <button onclick="submitHVCForm()"
+                    class="px-6 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg shadow-lg shadow-rose-200 flex items-center gap-2">
+                    <i class="fa-solid fa-paper-plane"></i> Register Patient
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- NEW: Equipment Modal (PE) -->
+    <!-- ========================================== -->
+    <div id="pe-modal" class="fixed inset-0 z-[70] hidden flex items-center justify-center fade-in">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closePEModal()"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-5xl mx-4 my-6 flex flex-col max-h-[90vh]">
+
+            <!-- Header -->
+            <div class="px-6 py-4 border-b border-cyan-100 flex justify-between items-center bg-cyan-50 rounded-t-2xl">
+                <div>
+                    <h3 class="font-bold text-xl text-slate-800"><i
+                            class="fa-solid fa-mask-ventilator text-cyan-600 mr-2"></i>New Device Record</h3>
+                    <p class="text-xs text-cyan-600/70 font-semibold">Request equipment for patient</p>
+                </div>
+                <button onclick="closePEModal()" class="text-slate-400 hover:text-cyan-600 text-xl"><i
+                        class="fa-solid fa-times"></i></button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-6 bg-slate-50/50">
+                <div
+                    class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-4 gap-6">
+
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-slate-500">Patient Name</label>
+                        <input type="text" id="pe-name"
+                            class="w-full p-2 border border-slate-200 rounded-lg text-sm bg-slate-50" readonly>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-slate-500">Patient ID</label>
+                        <input type="text" id="pe-id"
+                            class="w-full p-2 border border-slate-200 rounded-lg text-sm bg-slate-50" readonly>
+                    </div>
+                    <div class="space-y-1 md:col-span-2">
+                        <label class="text-xs font-bold text-slate-500">Medical Diagnosis</label>
+                        <input type="text" id="pe-diagnosis"
+                            class="w-full p-2 border border-slate-200 rounded-lg text-sm">
+                    </div>
+
+                    <div class="space-y-1 md:col-span-2">
+                        <label class="text-xs font-bold text-slate-500">Area / Region</label>
+                        <select id="pe-area" class="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white">
+                            <option value="">Select...</option>
+                            <option value="Hebron">Hebron</option>
+                            <option value="Jericho">Jericho</option>
+                            <option value="Jerusalem">Jerusalem</option>
+                            <option value="Bethlehem">Bethlehem</option>
+                            <option value="Ramallah">Ramallah</option>
+                            <option value="Nablus">Nablus</option>
+                            <option value="Jenin">Jenin</option>
+                            <option value="Tulkarm">Tulkarm</option>
+                            <option value="Qalqilya">Qalqilya</option>
+                            <option value="Salfit">Salfit</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1 md:col-span-2">
+                        <label class="text-xs font-bold text-slate-500">Contact Number</label>
+                        <input type="text" id="pe-phone" class="w-full p-2 border border-slate-200 rounded-lg text-sm">
+                    </div>
+
+                    <!-- Recipient -->
+                    <h4
+                        class="md:col-span-4 mt-2 text-xs font-bold text-slate-400 uppercase border-b border-slate-100 pb-1">
+                        Recipient Info</h4>
+
+                    <div class="space-y-1 md:col-span-2">
+                        <label class="text-xs font-bold text-slate-500">Device Recipient Name</label>
+                        <input type="text" id="pe-recipient"
+                            class="w-full p-2 border border-slate-200 rounded-lg text-sm">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-slate-500">Recipient ID</label>
+                        <input type="text" id="pe-recipient-id"
+                            class="w-full p-2 border border-slate-200 rounded-lg text-sm">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-slate-500">Relationship</label>
+                        <input type="text" id="pe-relationship"
+                            class="w-full p-2 border border-slate-200 rounded-lg text-sm">
+                    </div>
+
+                    <!-- Device Info -->
+                    <h4
+                        class="md:col-span-4 mt-2 text-xs font-bold text-slate-400 uppercase border-b border-slate-100 pb-1">
+                        Device Details</h4>
+
+                    <div class="space-y-1 md:col-span-2">
+                        <label class="text-xs font-bold text-slate-500">Required Device</label>
+                        <select id="pe-device"
+                            class="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white font-bold text-cyan-700">
+                            <option value="">Select...</option>
+                            <option value="O2 Generator">O2 Generator</option>
+                            <option value="Nebulizer">Nebulizer</option>
+                            <option value="Suction Machine">Suction Machine</option>
+                            <option value="Air Mattress">Air Mattress</option>
+                            <option value="Lymphatic Drainage Device">Lymphatic Drainage Device</option>
+                            <option value="Commode">Commode</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1 md:col-span-2">
+                        <label class="text-xs font-bold text-slate-500">Receipt Status</label>
+                        <select id="pe-status" class="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white">
+                            <option value="Pending">Pending</option>
+                            <option value="Received">Received</option>
+                            <option value="Delivered">Delivered</option>
+                        </select>
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-slate-500">Delivery Date</label>
+                        <input type="date" id="pe-date-delivery"
+                            class="w-full p-2 border border-slate-200 rounded-lg text-sm">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-slate-500">Return Date (Expected)</label>
+                        <input type="date" id="pe-date-return"
+                            class="w-full p-2 border border-slate-200 rounded-lg text-sm">
+                    </div>
+
+                    <div class="md:col-span-4 space-y-1">
+                        <label class="text-xs font-bold text-slate-500">Notes</label>
+                        <textarea id="pe-notes" rows="3"
+                            class="w-full p-3 border border-slate-200 rounded-lg text-sm resize-none"></textarea>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="px-6 py-4 border-t border-slate-100 bg-white rounded-b-2xl flex justify-end gap-3">
+                <div id="pe-status-msg" class="mr-auto text-sm font-bold text-slate-500 flex items-center hidden">
+                    <i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Sending to Equipment App...
+                </div>
+                <button onclick="closePEModal()"
+                    class="px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-lg border border-transparent font-medium">Cancel</button>
+                <button onclick="submitPEForm()"
+                    class="px-6 py-2 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-lg shadow-lg shadow-cyan-200 flex items-center gap-2">
+                    <i class="fa-solid fa-save"></i> Save Record
+                </button>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>
