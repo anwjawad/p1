@@ -4778,45 +4778,6 @@ function fetchHVCPatients() {
         .catch(e => console.warn("HVC Fetch Error (Offline?)", e));
 }
 
-// --- Debug HVC ---
-async function debugHVC() {
-    // 1. Alert user we are checking
-    const btn = document.querySelector('button[onclick="debugHVC()"]');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking...';
-
-    try {
-        const url = HVC_API_URL + "?action=get_patient_list";
-        const res = await fetch(url);
-        const data = await res.json();
-
-        let msg = "Debug Raw Response:\n";
-        msg += `Root Type: ${typeof data}\n`;
-        if (typeof data === 'object' && data !== null) {
-            msg += `Root Keys: ${Object.keys(data).join(', ')}\n`;
-        }
-        msg += `\nRaw Snippet: ${JSON.stringify(data).substring(0, 300)}...`;
-
-        // If it looks like an array, try to show the first item
-        let listCandidate = null;
-        if (Array.isArray(data)) listCandidate = data;
-        else if (data.patients && Array.isArray(data.patients)) listCandidate = data.patients;
-        else if (data.data && Array.isArray(data.data)) listCandidate = data.data;
-
-        if (listCandidate) {
-            msg += `\n\nDetected List (${listCandidate.length} items).\nFirst Item: ${JSON.stringify(listCandidate[0])}`;
-        }
-
-        alert(msg);
-        console.log("Debug HVC Raw:", data);
-
-    } catch (e) {
-        alert("Fetch Error: " + e.message);
-    } finally {
-        btn.innerHTML = originalText;
-    }
-}
-
 // --- Home Visit Logic ---
 
 function openHVCModal() {
