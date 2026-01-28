@@ -41,7 +41,8 @@ var appData = {
 
     currentPatient: null,
     historyIndex: { ids: new Set(), codes: new Set() },
-    hvcList: []
+    hvcList: [],
+    pharmacyMode: false // New Mode
 };
 
 // Pre-load history existence index
@@ -412,6 +413,87 @@ function GasApiAvailable() {
 }
 
 // --- Bulk Actions & UI ---
+
+// --- Pharmacy Mode ---
+
+function togglePharmacyMode() {
+    appData.pharmacyMode = !appData.pharmacyMode;
+
+    // Disable Selection Mode if active
+    if (appData.selectionMode) {
+        toggleSelectionMode();
+    }
+
+    const btn = document.getElementById('btn-pharmacy-mode');
+
+    if (appData.pharmacyMode) {
+        btn.classList.add('bg-indigo-600', 'text-white', 'border-indigo-600');
+        btn.classList.remove('bg-white', 'text-slate-600', 'border-slate-200');
+        btn.innerHTML = '<i class="fa-solid fa-times mr-2"></i> Exit Pharmacy';
+    } else {
+        btn.classList.remove('bg-indigo-600', 'text-white', 'border-indigo-600');
+        btn.classList.add('bg-white', 'text-slate-600', 'border-slate-200');
+        btn.innerHTML = '<i class="fa-solid fa-prescription-bottle-medical mr-2"></i> Pharmacy';
+    }
+
+    // Re-render current view
+    if (appData.currentWard) {
+        renderPatientsGrid(appData.wards[appData.currentWard]);
+    }
+}
+
+async function savePharmacyUpdate(patientId, type, rawValue) {
+    const p = appData.patients.find(pt => pt.id === patientId);
+    if (!p) return;
+
+    // Parse existing meds
+    let meds = { regular: '', prn: '' };
+    try {
+        if (p.medications && typeof p.medications === 'object') {
+            meds = p.medications;
+        } else if (p.medications && typeof p.medications === 'string' && p.medications.trim().startsWith('{')) {
+            meds = JSON.parse(p.medications);
+        } else {
+            meds.regular = p.medications || '';
+        }
+    } catch (e) {
+        meds.regular = p.medications || '';
+    }
+
+    // Update specific field
+    if (type === 'regular') meds.regular = rawValue;
+    if (type === 'prn') meds.prn = rawValue;
+
+    // Update Local Object (stringified for consistency with backend expectation if needed, but we try to keep object locally if possible? 
+    // Wait, main.js load logic parses it. But save logic mimics modal which stringifies it.
+    // Let's stringify to be safe and consistent with `triggerSave` in modal.
+    const jsonStr = JSON.stringify(meds);
+    p.medications = jsonStr;
+
+    // Sync to Backend
+    const updates = {};
+    updates[patientId] = { medications: jsonStr };
+
+    // Show mini status on card handling is done in renderer via UI feedback, 
+    // here we just fire and forget or use global status?
+    // Let's use global status for now if visible, or console.
+
+    if (GasApiAvailable()) {
+        await syncBatchUpdate(updates);
+    }
+}
+
+// Global exposure for renderer to call
+window.handleRegularPasteExternal = (e, callback) => {
+    // We reuse the logic from handleRegularPaste but adapted for an arbitrary target
+    // Actually handleRegularPaste uses e.target.
+    // We can just call it if we attach it to the event.
+    handleRegularPaste(e);
+};
+
+window.handlePrnPasteExternal = (e) => {
+    handlePrnPaste(e);
+};
 
 function toggleSelectionMode() {
     appData.selectionMode = !appData.selectionMode;

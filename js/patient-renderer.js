@@ -20,125 +20,244 @@ function renderPatientsGrid(patients) {
     patients.forEach((p, index) => {
         const card = document.createElement('div');
 
-        // Base classes
-        let classes = "bg-white rounded-2xl p-4 md:p-5 shadow-sm transition-all duration-300 border border-slate-100 relative overflow-hidden animate-entry opacity-0";
+        // Check if Pharmacy Mode is Active
+        if (appData.pharmacyMode) {
+            // --- PHARMACY CARD LAYOUT ---
+            let classes = "bg-white rounded-2xl p-4 shadow-sm border-2 border-slate-100 hover:border-indigo-300 transition-all flex flex-col h-[500px] relative animate-entry"; // Fixed height for consistency
+            card.className = classes;
+            card.style.animationDelay = `${index * 50}ms`;
 
-        // Interactive classes
-        if (!appData.selectionMode) {
-            classes += " hover:shadow-lg hover:-translate-y-1 cursor-pointer group";
-        } else {
-            classes += " cursor-pointer";
-        }
-
-        // Highlight Logic
-        if (p.is_highlighted) {
-            classes += " ring-2 ring-yellow-400 bg-yellow-50/30";
-        }
-
-        // Selection State Logic
-        const isSelected = appData.selectedPatientIds && appData.selectedPatientIds.has(p.id);
-        if (isSelected) {
-            classes += " ring-2 ring-medical-500 bg-medical-50";
-        }
-
-        card.className = classes;
-        card.style.animationDelay = `${index * 50}ms`;
-
-        // Click Handler
-        card.onclick = (e) => {
-            if (appData.selectionMode) {
-                e.stopPropagation();
-                if (typeof togglePatientSelection === 'function') togglePatientSelection(p.id, card);
-            } else {
-                if (typeof openModal === 'function') openModal(p);
+            // Parse Meds for Display
+            let meds = { regular: '', prn: '' };
+            try {
+                if (p.medications && typeof p.medications === 'object') {
+                    meds = p.medications;
+                } else if (p.medications && typeof p.medications === 'string' && p.medications.trim().startsWith('{')) {
+                    meds = JSON.parse(p.medications);
+                } else {
+                    meds.regular = p.medications || '';
+                }
+            } catch (e) {
+                meds.regular = p.medications || '';
             }
-        };
 
-        // --- Selection Checkbox ---
-        let selectionCheckbox = '';
-        if (appData.selectionMode) {
-            const checkStateClass = isSelected ? 'bg-medical-500 border-medical-500' : 'bg-white border-slate-300';
-            const checkIconClass = isSelected ? '' : 'hidden';
-            selectionCheckbox = `
+            card.innerHTML = `
+                <!-- Compact Header -->
+                <div class="flex justify-between items-center mb-3 pb-2 border-b border-slate-100">
+                    <div>
+                        <h3 class="font-bold text-base text-slate-800 leading-tight">${p.name}</h3>
+                        <div class="text-[10px] text-slate-400 font-mono">${p.code} | Age: ${parseInt(p.age || 0)}</div>
+                    </div>
+                    <div class="bg-indigo-50 text-indigo-600 text-[10px] font-bold px-2 py-1 rounded whitespace-nowrap">RM ${p.room}</div>
+                </div>
+
+                <!-- Medication Editors -->
+                <div class="flex-1 flex flex-col gap-2 overflow-hidden">
+                    
+                    <!-- Regular Meds -->
+                    <div class="flex-1 flex flex-col min-h-0">
+                        <label class="text-[10px] font-bold text-indigo-600 uppercase mb-1 flex justify-between">
+                            <span>Regular Medications</span>
+                            <i class="fa-solid fa-pills opacity-50"></i>
+                        </label>
+                        <textarea class="w-full flex-1 resize-none bg-slate-50 border border-slate-200 rounded p-2 text-xs font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all placeholder-slate-300 med-editor-reg"
+                            placeholder="Paste Regular Meds..." spellcheck="false" data-id="${p.id}">${meds.regular || ''}</textarea>
+                    </div>
+
+                    <!-- PRN Meds -->
+                    <div class="flex-1 flex flex-col min-h-0 border-t border-slate-100 pt-2">
+                        <label class="text-[10px] font-bold text-pink-600 uppercase mb-1 flex justify-between">
+                            <span>PRN / Others</span>
+                            <i class="fa-solid fa-tablets opacity-50"></i>
+                        </label>
+                        <textarea class="w-full flex-1 resize-none bg-slate-50 border border-slate-200 rounded p-2 text-xs font-mono focus:ring-2 focus:ring-pink-500 outline-none transition-all placeholder-slate-300 med-editor-prn"
+                            placeholder="Paste PRN Meds..." spellcheck="false" data-id="${p.id}">${meds.prn || ''}</textarea>
+                    </div>
+                </div>
+                
+                <!-- Status/Save Indicator (Mini) -->
+                <div class="absolute bottom-2 right-4 text-[9px] text-slate-300 font-bold save-status opacity-0 transition-opacity">
+                    SAVED
+                </div>
+            `;
+
+            // Attach Events
+            const txtReg = card.querySelector('.med-editor-reg');
+            const txtPrn = card.querySelector('.med-editor-prn');
+            const statusIndicator = card.querySelector('.save-status');
+
+            const showSaving = () => {
+                statusIndicator.innerText = "SAVING...";
+                statusIndicator.classList.remove('opacity-0', 'text-green-500');
+                statusIndicator.classList.add('text-blue-500');
+            };
+
+            const showSaved = () => {
+                statusIndicator.innerText = "SAVED";
+                statusIndicator.classList.remove('opacity-0', 'text-blue-500');
+                statusIndicator.classList.add('text-green-500');
+                setTimeout(() => {
+                    statusIndicator.classList.add('opacity-0');
+                }, 2000);
+            };
+
+            // Smart Paste Handlers
+            txtReg.addEventListener('paste', (e) => {
+                if (window.handleRegularPasteExternal) {
+                    window.handleRegularPasteExternal(e);
+                    // Manually trigger save for this patient since handling logic only updates UI
+                    handleSave('regular', txtReg);
+                }
+            });
+
+            txtPrn.addEventListener('paste', (e) => {
+                if (window.handlePrnPasteExternal) {
+                    window.handlePrnPasteExternal(e);
+                    handleSave('prn', txtPrn);
+                }
+            });
+
+            // Save on Change / Blur
+            const handleSave = async (type, el) => {
+                showSaving();
+                await savePharmacyUpdate(p.id, type, el.value);
+                showSaved();
+            };
+
+            txtReg.addEventListener('change', () => handleSave('regular', txtReg));
+            txtPrn.addEventListener('change', () => handleSave('prn', txtPrn));
+
+            // Auto-save on stop typing (debounce)
+            let timeout = null;
+            const debouncedSave = (type, el) => {
+                if (timeout) clearTimeout(timeout);
+                timeout = setTimeout(() => handleSave(type, el), 1500);
+            };
+
+            txtReg.addEventListener('input', () => debouncedSave('regular', txtReg));
+            txtPrn.addEventListener('input', () => debouncedSave('prn', txtPrn));
+
+
+        } else {
+            // --- STANDARD CARD LAYOUT ---
+            let classes = "bg-white rounded-2xl p-4 md:p-5 shadow-sm transition-all duration-300 border border-slate-100 relative overflow-hidden animate-entry opacity-0";
+
+            // Interactive classes
+            if (!appData.selectionMode) {
+                classes += " hover:shadow-lg hover:-translate-y-1 cursor-pointer group";
+            } else {
+                classes += " cursor-pointer";
+            }
+
+            // Highlight Logic
+            if (p.is_highlighted) {
+                classes += " ring-2 ring-yellow-400 bg-yellow-50/30";
+            }
+
+            // Selection State Logic
+            const isSelected = appData.selectedPatientIds && appData.selectedPatientIds.has(p.id);
+            if (isSelected) {
+                classes += " ring-2 ring-medical-500 bg-medical-50";
+            }
+
+            card.className = classes;
+            card.style.animationDelay = `${index * 50}ms`;
+
+            // Click Handler
+            card.onclick = (e) => {
+                if (appData.selectionMode) {
+                    e.stopPropagation();
+                    if (typeof togglePatientSelection === 'function') togglePatientSelection(p.id, card);
+                } else {
+                    if (typeof openModal === 'function') openModal(p);
+                }
+            };
+
+            // --- Selection Checkbox ---
+            let selectionCheckbox = '';
+            if (appData.selectionMode) {
+                const checkStateClass = isSelected ? 'bg-medical-500 border-medical-500' : 'bg-white border-slate-300';
+                const checkIconClass = isSelected ? '' : 'hidden';
+                selectionCheckbox = `
                 <div class="absolute top-4 right-4 z-20">
                     <div class="checkbox-indicator w-6 h-6 rounded-full border-2 ${checkStateClass} flex items-center justify-center transition-all">
                         <i class="fa-solid fa-check text-white text-xs ${checkIconClass}"></i>
                     </div>
                 </div>
             `;
-        }
+            }
 
-        // --- Labs Badges ---
-        let labBadges = '';
-        if (p.labs) {
-            Object.entries(p.labs).forEach(([k, v]) => {
-                const isStandard = appData.ranges && appData.ranges[k];
-                // Use global checkLabStatus if available
-                const status = (isStandard && typeof checkLabStatus === 'function') ? checkLabStatus(k, v.value) : 'custom';
+            // --- Labs Badges ---
+            let labBadges = '';
+            if (p.labs) {
+                Object.entries(p.labs).forEach(([k, v]) => {
+                    const isStandard = appData.ranges && appData.ranges[k];
+                    // Use global checkLabStatus if available
+                    const status = (isStandard && typeof checkLabStatus === 'function') ? checkLabStatus(k, v.value) : 'custom';
 
-                if (status !== 'normal' && v.value) {
-                    let colorClass = 'bg-indigo-50 text-indigo-600 border-indigo-100';
-                    let icon = '•';
+                    if (status !== 'normal' && v.value) {
+                        let colorClass = 'bg-indigo-50 text-indigo-600 border-indigo-100';
+                        let icon = '•';
 
-                    if (status === 'high') {
-                        colorClass = 'bg-red-50 text-red-600 border-red-100';
-                        icon = '↑';
-                    } else if (status === 'low') {
-                        colorClass = 'bg-orange-50 text-orange-600 border-orange-100';
-                        icon = '↓';
-                    }
+                        if (status === 'high') {
+                            colorClass = 'bg-red-50 text-red-600 border-red-100';
+                            icon = '↑';
+                        } else if (status === 'low') {
+                            colorClass = 'bg-orange-50 text-orange-600 border-orange-100';
+                            icon = '↓';
+                        }
 
-                    labBadges += `
+                        labBadges += `
                         <div class="px-1.5 py-0.5 rounded border text-[10px] font-bold ${colorClass} flex items-center gap-1">
                             <span>${k}</span>
                             <span>${v.value}</span>
                             <span>${icon}</span>
                         </div>
                     `;
-                }
-            });
-        }
-
-        // --- Symptoms (Active + Notes) ---
-        let symptomText = '';
-        if (p.symptoms) {
-            // Filter where value.active is true
-            const activeSymptoms = Object.entries(p.symptoms)
-                .filter(([k, v]) => v && v.active === true);
-
-            if (activeSymptoms.length > 0) {
-                const chips = activeSymptoms.map(([k, v]) => {
-                    let noteHtml = '';
-                    if (v.note && v.note.trim()) {
-                        noteHtml = `<span class="ml-1 pl-1 border-l border-rose-200 text-rose-800 italic font-normal max-w-[150px] truncate inline-block align-bottom">${v.note}</span>`;
                     }
+                });
+            }
 
-                    return `<span class="px-1.5 py-0.5 rounded border text-[10px] bg-rose-50 text-rose-700 border-rose-100 font-bold flex items-center mb-1 mr-1 w-max max-w-full">
+            // --- Symptoms (Active + Notes) ---
+            let symptomText = '';
+            if (p.symptoms) {
+                // Filter where value.active is true
+                const activeSymptoms = Object.entries(p.symptoms)
+                    .filter(([k, v]) => v && v.active === true);
+
+                if (activeSymptoms.length > 0) {
+                    const chips = activeSymptoms.map(([k, v]) => {
+                        let noteHtml = '';
+                        if (v.note && v.note.trim()) {
+                            noteHtml = `<span class="ml-1 pl-1 border-l border-rose-200 text-rose-800 italic font-normal max-w-[150px] truncate inline-block align-bottom">${v.note}</span>`;
+                        }
+
+                        return `<span class="px-1.5 py-0.5 rounded border text-[10px] bg-rose-50 text-rose-700 border-rose-100 font-bold flex items-center mb-1 mr-1 w-max max-w-full">
                         <span class="shrink-0">${k}</span>
                         ${noteHtml}
                     </span>`;
-                }).join('');
-                symptomText = `<div class="flex flex-wrap mt-2">${chips}</div>`;
+                    }).join('');
+                    symptomText = `<div class="flex flex-wrap mt-2">${chips}</div>`;
+                }
             }
-        }
 
-        // --- Plan Text Preview (UPDATED: Text List) ---
-        let planPreviewHTML = '';
-        if (p.plan && Array.isArray(p.plan) && p.plan.length > 0) {
-            planPreviewHTML = `<div class="mt-3 pt-2 border-t border-slate-50 grid grid-cols-3 gap-1">`;
-            p.plan.forEach((item, i) => {
-                let colorClass = 'text-slate-600';
-                let icon = 'circle';
+            // --- Plan Text Preview (UPDATED: Text List) ---
+            let planPreviewHTML = '';
+            if (p.plan && Array.isArray(p.plan) && p.plan.length > 0) {
+                planPreviewHTML = `<div class="mt-3 pt-2 border-t border-slate-50 grid grid-cols-3 gap-1">`;
+                p.plan.forEach((item, i) => {
+                    let colorClass = 'text-slate-600';
+                    let icon = 'circle';
 
-                if (item.type === 'medication') { colorClass = 'text-indigo-600'; icon = 'pills'; }
-                else if (item.type === 'equipment') { colorClass = 'text-cyan-600'; icon = 'mask-ventilator'; }
-                else if (item.type === 'consult') { colorClass = 'text-purple-600'; icon = 'user-doctor'; }
-                else if (item.type === 'note') { colorClass = 'text-amber-600'; icon = 'note-sticky'; }
+                    if (item.type === 'medication') { colorClass = 'text-indigo-600'; icon = 'pills'; }
+                    else if (item.type === 'equipment') { colorClass = 'text-cyan-600'; icon = 'mask-ventilator'; }
+                    else if (item.type === 'consult') { colorClass = 'text-purple-600'; icon = 'user-doctor'; }
+                    else if (item.type === 'note') { colorClass = 'text-amber-600'; icon = 'note-sticky'; }
 
-                let displayText = item.details;
-                if (item.type === 'medication' && item.action) displayText = `<strong>${item.action}:</strong> ${item.details}`;
+                    let displayText = item.details;
+                    if (item.type === 'medication' && item.action) displayText = `<strong>${item.action}:</strong> ${item.details}`;
 
-                planPreviewHTML += `
+                    planPreviewHTML += `
                     <div class="group/plan flex gap-2 items-start text-xs ${colorClass} relative pr-4">
                         <i class="fa-solid fa-${icon} mt-0.5 shrink-0"></i>
                         <span class="break-words font-medium leading-tight">${displayText}</span>
@@ -150,15 +269,15 @@ function renderPatientsGrid(patients) {
                         </button>
                     </div>
                 `;
-            });
-            planPreviewHTML += `</div>`;
-        }
+                });
+                planPreviewHTML += `</div>`;
+            }
 
-        // Highlight Star
-        const starClass = p.is_highlighted ? 'text-yellow-400 opacity-100' : 'text-slate-200 opacity-0 group-hover:opacity-100';
+            // Highlight Star
+            const starClass = p.is_highlighted ? 'text-yellow-400 opacity-100' : 'text-slate-200 opacity-0 group-hover:opacity-100';
 
-        // --- Render Card HTML (Refined Version) ---
-        card.innerHTML = `
+            // --- Render Card HTML (Refined Version) ---
+            card.innerHTML = `
             ${selectionCheckbox}
             <button class="absolute top-4 right-4 z-10 ${starClass} hover:text-yellow-400 transition-all ${appData.selectionMode ? 'hidden' : ''}" onclick="toggleHighlight(event, '${p.id}')">
                 <i class="fa-solid fa-star"></i>
@@ -206,32 +325,32 @@ function renderPatientsGrid(patients) {
                     
                     <!-- HVC Status Indicator (Left Side) -->
                     ${(() => {
-                const isHvc = (appData.hvcList && (
-                    appData.hvcList.includes(String(p.code)) ||
-                    appData.hvcList.includes(String(p.id)) ||
-                    (p.code && appData.hvcList.includes(String(p.code).replace(/\D/g, '')))
-                ));
-                return isHvc ?
-                    `<span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center border border-green-200" title="Registered for Home Visit">
+                    const isHvc = (appData.hvcList && (
+                        appData.hvcList.includes(String(p.code)) ||
+                        appData.hvcList.includes(String(p.id)) ||
+                        (p.code && appData.hvcList.includes(String(p.code).replace(/\D/g, '')))
+                    ));
+                    return isHvc ?
+                        `<span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center border border-green-200" title="Registered for Home Visit">
                             <i class="fa-solid fa-house-medical mr-1"></i> HVC
                          </span>` : '';
-            })()}
+                })()}
                 </div>
                 
                 ${!appData.selectionMode ? `
                 <div class="flex gap-2">
                     <!-- Add to HVC Button (If not registered) -->
                     ${(() => {
-                    const isHvc = (appData.hvcList && (
-                        appData.hvcList.includes(String(p.code)) ||
-                        appData.hvcList.includes(String(p.id)) ||
-                        (p.code && appData.hvcList.includes(String(p.code).replace(/\D/g, '')))
-                    ));
-                    return !isHvc ?
-                        `<button class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-colors btn-hvc-add" title="Register for Home Visit">
+                        const isHvc = (appData.hvcList && (
+                            appData.hvcList.includes(String(p.code)) ||
+                            appData.hvcList.includes(String(p.id)) ||
+                            (p.code && appData.hvcList.includes(String(p.code).replace(/\D/g, '')))
+                        ));
+                        return !isHvc ?
+                            `<button class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-colors btn-hvc-add" title="Register for Home Visit">
                             <i class="fa-solid fa-house-medical"></i>
                         </button>` : '';
-                })()}
+                    })()}
                 
                     ${p.labImages && p.labImages.length > 0 ? `
                     <button class="w-8 h-8 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white flex items-center justify-center transition-colors btn-view-labs" title="View Labs">
@@ -251,64 +370,65 @@ function renderPatientsGrid(patients) {
             </div>
         `;
 
-        if (!appData.selectionMode) {
-            // Attach event listener for Meds
-            const medBtn = card.querySelector('.btn-meds');
-            if (medBtn) {
-                medBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    if (typeof openMedicationModal === 'function') openMedicationModal(p);
-                };
-            }
-            // Attach event listener for Plan
-            const planBtn = card.querySelector('.btn-plan');
-            if (planBtn) {
-                planBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    if (typeof openPlanModal === 'function') openPlanModal(p);
-                };
-            }
-            // Attach event listener for Symptoms
-            const symBtn = card.querySelector('.btn-symptoms');
-            if (symBtn) {
-                symBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    if (typeof openSymptomsModal === 'function') openSymptomsModal(p);
-                };
-            }
-            // Attach event listener for View Labs
-            const labsBtn = card.querySelector('.btn-view-labs');
-            if (labsBtn) {
-                labsBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    // Open the LAST image (most recent)
-                    if (p.labImages && p.labImages.length > 0) {
-                        const lastImg = p.labImages[p.labImages.length - 1];
-                        // Use the local URL (Base64) if valid, otherwise fallback to Drive ID logic
-                        const robustUrl = (lastImg.url && lastImg.url.length > 50)
-                            ? lastImg.url
-                            : `https://drive.google.com/thumbnail?id=${lastImg.id}&sz=w3000`;
+            if (!appData.selectionMode) {
+                // Attach event listener for Meds
+                const medBtn = card.querySelector('.btn-meds');
+                if (medBtn) {
+                    medBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        if (typeof openMedicationModal === 'function') openMedicationModal(p);
+                    };
+                }
+                // Attach event listener for Plan
+                const planBtn = card.querySelector('.btn-plan');
+                if (planBtn) {
+                    planBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        if (typeof openPlanModal === 'function') openPlanModal(p);
+                    };
+                }
+                // Attach event listener for Symptoms
+                const symBtn = card.querySelector('.btn-symptoms');
+                if (symBtn) {
+                    symBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        if (typeof openSymptomsModal === 'function') openSymptomsModal(p);
+                    };
+                }
+                // Attach event listener for View Labs
+                const labsBtn = card.querySelector('.btn-view-labs');
+                if (labsBtn) {
+                    labsBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        // Open the LAST image (most recent)
+                        if (p.labImages && p.labImages.length > 0) {
+                            const lastImg = p.labImages[p.labImages.length - 1];
+                            // Use the local URL (Base64) if valid, otherwise fallback to Drive ID logic
+                            const robustUrl = (lastImg.url && lastImg.url.length > 50)
+                                ? lastImg.url
+                                : `https://drive.google.com/thumbnail?id=${lastImg.id}&sz=w3000`;
 
-                        if (typeof openImageLightbox === 'function') {
-                            openImageLightbox(robustUrl);
-                        } else {
-                            // Fallback if main.js not loaded (unlikely)
-                            window.open(lastImg.url, '_blank');
+                            if (typeof openImageLightbox === 'function') {
+                                openImageLightbox(robustUrl);
+                            } else {
+                                // Fallback if main.js not loaded (unlikely)
+                                window.open(lastImg.url, '_blank');
+                            }
                         }
-                    }
-                };
-            }
-            // Attach event listener for HVC Add
-            const hvcBtn = card.querySelector('.btn-hvc-add');
-            if (hvcBtn) {
-                hvcBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    if (typeof openHVCModal === 'function') {
-                        // Ensure context is set
-                        appData.currentPatient = p;
-                        openHVCModal();
-                    }
-                };
+                    };
+                }
+                // Attach event listener for HVC Add
+                const hvcBtn = card.querySelector('.btn-hvc-add');
+                if (hvcBtn) {
+                    hvcBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        if (typeof openHVCModal === 'function') {
+                            // Ensure context is set
+                            appData.currentPatient = p;
+                            openHVCModal();
+                        }
+                    };
+                }
             }
         }
 
