@@ -203,10 +203,36 @@ function renderPatientsGrid(patients) {
                     <span class="text-xs text-slate-500 font-medium" title="${p.provider || 'Unassigned'}">
                         <i class="fa-solid fa-user-doctor mr-1"></i> ${p.provider || 'Unassigned'}
                     </span>
+                    
+                    <!-- HVC Status Indicator (Left Side) -->
+                    ${(() => {
+                const isHvc = (appData.hvcList && (
+                    appData.hvcList.includes(String(p.code)) ||
+                    appData.hvcList.includes(String(p.id)) ||
+                    (p.code && appData.hvcList.includes(String(p.code).replace(/\D/g, '')))
+                ));
+                return isHvc ?
+                    `<span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center border border-green-200" title="Registered for Home Visit">
+                            <i class="fa-solid fa-house-medical mr-1"></i> HVC
+                         </span>` : '';
+            })()}
                 </div>
                 
                 ${!appData.selectionMode ? `
                 <div class="flex gap-2">
+                    <!-- Add to HVC Button (If not registered) -->
+                    ${(() => {
+                    const isHvc = (appData.hvcList && (
+                        appData.hvcList.includes(String(p.code)) ||
+                        appData.hvcList.includes(String(p.id)) ||
+                        (p.code && appData.hvcList.includes(String(p.code).replace(/\D/g, '')))
+                    ));
+                    return !isHvc ?
+                        `<button class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-colors btn-hvc-add" title="Register for Home Visit">
+                            <i class="fa-solid fa-house-medical"></i>
+                        </button>` : '';
+                })()}
+                
                     ${p.labImages && p.labImages.length > 0 ? `
                     <button class="w-8 h-8 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white flex items-center justify-center transition-colors btn-view-labs" title="View Labs">
                         <i class="fa-solid fa-flask"></i>
@@ -269,6 +295,18 @@ function renderPatientsGrid(patients) {
                             // Fallback if main.js not loaded (unlikely)
                             window.open(lastImg.url, '_blank');
                         }
+                    }
+                };
+            }
+            // Attach event listener for HVC Add
+            const hvcBtn = card.querySelector('.btn-hvc-add');
+            if (hvcBtn) {
+                hvcBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (typeof openHVCModal === 'function') {
+                        // Ensure context is set
+                        appData.currentPatient = p;
+                        openHVCModal();
                     }
                 };
             }

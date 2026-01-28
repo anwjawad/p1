@@ -40,7 +40,8 @@ var appData = {
     currentWard: null,
 
     currentPatient: null,
-    historyIndex: { ids: new Set(), codes: new Set() }
+    historyIndex: { ids: new Set(), codes: new Set() },
+    hvcList: []
 };
 
 // Pre-load history existence index
@@ -234,6 +235,9 @@ async function fetchData() {
             const target = populatedWard || wardKeys[0];
             if (target) selectWard(target);
         }
+
+        // Fetch HVC Status in parallel
+        fetchHVCPatients();
 
     } catch (e) {
         console.error("Failed to load data", e);
@@ -4725,6 +4729,94 @@ function constructPatientQueryParams(p) {
 const HVC_API_URL = "https://script.google.com/macros/s/AKfycbzKCvkaQ8sDBoYCTWd9K4Rt9L4MPK3p1llGZwDT5nd5E33NeRen1l973EtFQyI42FvQ/exec";
 const PE_API_URL = "https://script.google.com/macros/s/AKfycbwjwZcOtRy0SmgBZABxPVDE30NHD2y_Tfu8py5P_VmETiPZz07QHleM7vTQYWyaZQB2/exec";
 
+function fetchHVCPatients() {
+    console.log("Fetching HVC Patient List...");
+    const url = HVC_API_URL + "?action=get_patient_list";
+
+    fetch(url, {
+        method: 'GET',
+        mode: 'cors'
+    })
+        .then(res => res.json())
+        .then(data => {
+            // Robustly identify the list
+            let list = [];
+            if (Array.isArray(data)) {
+                list = data;
+            } else if (data && data.patients && Array.isArray(data.patients)) {
+                list = data.patients;
+            } else if (data && data.data && Array.isArray(data.data)) {
+                list = data.data;
+            }
+
+            if (list.length > 0) {
+                console.log("HVC List Loaded:", list.length);
+
+                // Store IDs for quick lookup (ensure string)
+                appData.hvcList = list.map(p => {
+                    let val = p;
+                    if (typeof p === 'object' && p !== null) {
+                        // Prioritize "Pt file Num." as requested by user, then others
+                        val = p['Pt file Num.'] || p['File Num.'] || p['code'] || p['id'] || p['ID'] || p['File_No'] || Object.values(p)[0];
+                    }
+                    // Strip non-digits for comparison (e.g. PAT123 -> 123)
+                    return String(val || '').replace(/\D/g, '');
+                }).filter(id => id.length > 0);
+
+                console.log("HVC Parsed IDs:", appData.hvcList.slice(0, 5));
+
+                // Re-render grid if data is already loaded to show badges
+                if (appData.currentWard && appData.wards[appData.currentWard]) {
+                    if (typeof renderPatientsGrid === 'function') {
+                        renderPatientsGrid(appData.wards[appData.currentWard]);
+                    }
+                }
+            } else {
+                console.warn("HVC List Fetch Failed or Empty", data);
+            }
+        })
+        .catch(e => console.warn("HVC Fetch Error (Offline?)", e));
+}
+
+// --- Debug HVC ---
+async function debugHVC() {
+    // 1. Alert user we are checking
+    const btn = document.querySelector('button[onclick="debugHVC()"]');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking...';
+
+    try {
+        const url = HVC_API_URL + "?action=get_patient_list";
+        const res = await fetch(url);
+        const data = await res.json();
+
+        let msg = "Debug Raw Response:\n";
+        msg += `Root Type: ${typeof data}\n`;
+        if (typeof data === 'object' && data !== null) {
+            msg += `Root Keys: ${Object.keys(data).join(', ')}\n`;
+        }
+        msg += `\nRaw Snippet: ${JSON.stringify(data).substring(0, 300)}...`;
+
+        // If it looks like an array, try to show the first item
+        let listCandidate = null;
+        if (Array.isArray(data)) listCandidate = data;
+        else if (data.patients && Array.isArray(data.patients)) listCandidate = data.patients;
+        else if (data.data && Array.isArray(data.data)) listCandidate = data.data;
+
+        if (listCandidate) {
+            msg += `\n\nDetected List (${listCandidate.length} items).\nFirst Item: ${JSON.stringify(listCandidate[0])}`;
+        }
+
+        alert(msg);
+        console.log("Debug HVC Raw:", data);
+
+    } catch (e) {
+        alert("Fetch Error: " + e.message);
+    } finally {
+        btn.innerHTML = originalText;
+    }
+}
+
 // --- Home Visit Logic ---
 
 function openHVCModal() {
@@ -4791,6 +4883,19 @@ async function submitHVCForm() {
         });
 
         saveQuickPlan('referral', `Registered in HVC: ${payload.data['Pt Name']}`);
+
+        // Update Local State (Immediate Feedback)
+        const newId = document.getElementById('hvc-id').value;
+        if (newId && appData.hvcList) {
+            appData.hvcList.push(String(newId).trim());
+            // Re-render if grid is active
+            if (appData.currentWard && appData.wards && appData.wards[appData.currentWard]) {
+                if (typeof renderPatientsGrid === 'function') {
+                    renderPatientsGrid(appData.wards[appData.currentWard]);
+                }
+            }
+        }
+
         closeHVCModal();
         alert("Patient registered in Home Visit system successfully!");
 
