@@ -12,6 +12,8 @@ var appData = {
     sections: [], // Persistent Sections Metadata
     selectionMode: false,
     selectedPatientIds: new Set(),
+    // Updated HVC API
+    HVC_API_URL: "https://script.google.com/macros/s/AKfycbzKCvkaQ8sDBoYCTWd9K4Rt9L4MPK3p1llGZwDT5nd5E33NeRen1l973EtFQyI42FvQ/exec",
 
     // Hardcoded ranges since they are static
     ranges: {
@@ -4779,6 +4781,92 @@ async function handleLabsImageUpload(file) {
 // INTEGRATION: External App Handoffs (HVC & PE)
 // ==========================================
 
+// ==========================================
+// HVC FORM LOGIC
+// ==========================================
+
+// ==========================================
+// HVC FORM LOGIC (Integrated from HVC App)
+// ==========================================
+
+function toggleDeathFields(select) {
+    const isDead = select.value === 'Died';
+    document.querySelectorAll('.death-field').forEach(el => {
+        if (isDead) {
+            el.classList.remove('hidden');
+        } else {
+            el.classList.add('hidden');
+        }
+    });
+}
+
+async function handleHVCSubmit(e) {
+    e.preventDefault();
+    const form = e.target;
+    const btn = form.querySelector('button[type="submit"]');
+    const status = document.getElementById('hvc-status');
+
+    // UI Loading State
+    const originalBtnText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Sending...';
+    status.classList.remove('hidden');
+
+    // Collect Data using FormData (Robust & Matches HVC App)
+    const formData = new FormData(form);
+    const data = {};
+    formData.forEach((value, key) => data[key] = value);
+
+    // Default Values / Cleanup
+    if (!data['Pt file Num.']) data['Pt file Num.'] = "TEMP-" + Date.now();
+    if (!data['number of visits']) data['number of visits'] = 0;
+
+    // Wrap in action property for backend routing
+    const payload = {
+        action: 'register',
+        data: data
+    };
+
+    console.log("HVC Final Payload:", JSON.stringify(payload, null, 2));
+
+    try {
+        // Use HVC_API_URL defined in global const
+        const response = await fetch(HVC_API_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload) // Send wrapped payload
+            // No-CORS mode is default behavior for simple POSTs to GAS if not specified, 
+            // but usually we want to read response if possible. 
+            // However, GAS 'doPost' usually requires 'application/json' or text/plain.
+            // main.js standard fetch implies text/plain usually to avoid preflight if not set.
+            // Let's stick to simple fetch as commonly used with GAS.
+        });
+
+        const result = await response.json();
+        console.log("HVC Backend Response:", result);
+
+        if (result.status === 'success') {
+            showToast("Patient Registered to HVC App!", "success");
+            form.reset();
+            closeHVCModal();
+            // Refresh patient list if necessary
+            if (typeof fetchHVCPatients === 'function') fetchHVCPatients();
+        } else {
+            throw new Error(result.error || result.message || "Unknown error");
+        }
+
+    } catch (error) {
+        console.error("HVC Submit Error:", error);
+        showToast("Error: " + error.message, "error");
+    } finally {
+        // Reset UI
+        btn.disabled = false;
+        btn.innerHTML = originalBtnText;
+        status.classList.add('hidden');
+    }
+}
+
+
+
 /**
  * Builds the URL Query String from Patient Data
  */
@@ -4863,14 +4951,29 @@ function fetchHVCPatients() {
 // --- Home Visit Logic ---
 
 function openHVCModal() {
-    if (!appData.currentPatient) return;
-    const p = appData.currentPatient;
+    // Clear all fields first
+    const fieldsToClear = [
+        'hvc-name', 'hvc-id', 'hvc-gender', 'hvc-age', 'hvc-phone', 'hvc-social',
+        'hvc-city', 'hvc-address', 'hvc-hospital', 'hvc-doctor', 'hvc-diagnosis-cat',
+        'hvc-diagnosis-detail', 'hvc-opioid', 'hvc-priority', 'hvc-ecog', 'hvc-ppi',
+        'hvc-pps', 'hvc-intent', 'hvc-survival', 'hvc-date-death', 'hvc-stage',
+        'hvc-site-referral', 'hvc-date-reg'
+    ];
+    fieldsToClear.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
 
-    // Pre-fill
-    document.getElementById('hvc-name').value = p.name || '';
-    document.getElementById('hvc-id').value = p.code || ''; // File Num
-    document.getElementById('hvc-age').value = p.age || '';
-    document.getElementById('hvc-diagnosis-detail').value = p.diagnosis || '';
+    // Pre-fill if patient selected
+    if (appData.currentPatient) {
+        document.getElementById('hvc-name').value = appData.currentPatient.name || '';
+        document.getElementById('hvc-id').value = appData.currentPatient.code || '';
+        document.getElementById('hvc-age').value = parseInt(appData.currentPatient.age) || '';
+        document.getElementById('hvc-diagnosis-detail').value = appData.currentPatient.diagnosis || '';
+        document.getElementById('hvc-phone').value = appData.currentPatient.phone || '';
+        // Try to map existing fields if available
+    }
+    // Always set registration date to today
     document.getElementById('hvc-date-reg').valueAsDate = new Date();
 
     // Show
@@ -4882,75 +4985,7 @@ function closeHVCModal() {
     document.getElementById('hvc-modal').classList.add('hidden');
 }
 
-async function submitHVCForm() {
-    const btn = document.querySelector('#hvc-modal button[onclick="submitHVCForm()"]');
-    const statusDiv = document.getElementById('hvc-status');
 
-    // UI Loading
-    btn.disabled = true;
-    btn.classList.add('opacity-50');
-    statusDiv.classList.remove('hidden');
-
-    // FIXED: Action must be 'register' to match Backend
-    const payload = {
-        action: 'register',
-        data: {
-            'Pt Name': document.getElementById('hvc-name').value,
-            'Pt file Num.': document.getElementById('hvc-id').value,
-            'Gender': document.getElementById('hvc-gender').value,
-            'Age': document.getElementById('hvc-age').value,
-            'phone No.': document.getElementById('hvc-phone').value,
-            'Social Status': document.getElementById('hvc-social').value,
-            'City/Area (Adress)': document.getElementById('hvc-city').value,
-            'Specific Home Address': document.getElementById('hvc-address').value,
-            'Hospital': document.getElementById('hvc-hospital').value,
-            'Primary Physician': document.getElementById('hvc-doctor').value,
-            'Diagnosis': document.getElementById('hvc-diagnosis-cat').value,
-            'Specific Diagnosis': document.getElementById('hvc-diagnosis-detail').value,
-            'Opioid?': document.getElementById('hvc-opioid').value,
-            'Priority': document.getElementById('hvc-priority').value,
-            'ECGO': document.getElementById('hvc-ecog').value,
-            'PPI': document.getElementById('hvc-ppi').value,
-            'PPS': document.getElementById('hvc-pps').value,
-            'Registration Date': document.getElementById('hvc-date-reg').value,
-            'Servival Status': 'Alive'
-        }
-    };
-
-    try {
-        await fetch(HVC_API_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        saveQuickPlan('referral', `Registered in HVC: ${payload.data['Pt Name']}`);
-
-        // Update Local State (Immediate Feedback)
-        const newId = document.getElementById('hvc-id').value;
-        if (newId && appData.hvcList) {
-            appData.hvcList.push(String(newId).trim());
-            // Re-render if grid is active
-            if (appData.currentWard && appData.wards && appData.wards[appData.currentWard]) {
-                if (typeof renderPatientsGrid === 'function') {
-                    renderPatientsGrid(appData.wards[appData.currentWard]);
-                }
-            }
-        }
-
-        closeHVCModal();
-        alert("Patient registered in Home Visit system successfully!");
-
-    } catch (e) {
-        console.error("HVC Submit Error", e);
-        alert("Failed to submit to Home Visit App. Check console.");
-    } finally {
-        btn.disabled = false;
-        btn.classList.remove('opacity-50');
-        statusDiv.classList.add('hidden');
-    }
-}
 
 
 // --- Equipment Logic ---
@@ -5035,11 +5070,44 @@ async function submitPEForm() {
 }
 
 // Global Exports
+// --- Toast Notification ---
+function showToast(message, type = 'success') {
+    // Create toast element if not exists
+    let toast = document.getElementById('toast-notification');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'toast-notification';
+        toast.className = 'fixed bottom-10 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-xl text-white font-medium transition-all duration-300 opacity-0 z-50 flex items-center gap-2';
+        document.body.appendChild(toast);
+    }
+
+    // specific styles
+    if (type === 'success') {
+        toast.className = 'fixed bottom-10 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-xl bg-slate-800 text-white font-medium transition-all duration-300 opacity-100 translate-y-0 z-50 flex items-center gap-2';
+        toast.innerHTML = '<i class="fa-solid fa-check-circle text-green-400"></i> ' + message;
+    } else {
+        toast.className = 'fixed bottom-10 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-xl bg-red-600 text-white font-medium transition-all duration-300 opacity-100 translate-y-0 z-50 flex items-center gap-2';
+        toast.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> ' + message;
+    }
+
+    // Show
+    setTimeout(() => {
+        toast.classList.add('opacity-0');
+        toast.classList.add('translate-y-4');
+        setTimeout(() => {
+            // keep element but hide
+            toast.className = 'fixed bottom-10 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-xl text-white font-medium transition-all duration-300 opacity-0 translate-y-4 z-50 flex items-center gap-2 pointer-events-none';
+        }, 300);
+    }, 3000);
+}
+
+// Global Exports
 window.openHVCModal = openHVCModal;
 window.closeHVCModal = closeHVCModal;
-window.submitHVCForm = submitHVCForm;
+window.handleHVCSubmit = handleHVCSubmit; // Export new function
 window.openPEModal = openPEModal;
 window.closePEModal = closePEModal;
 window.submitPEForm = submitPEForm;
+window.showToast = showToast;
 
 
