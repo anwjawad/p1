@@ -12,8 +12,6 @@ var appData = {
     sections: [], // Persistent Sections Metadata
     selectionMode: false,
     selectedPatientIds: new Set(),
-    // Updated HVC API
-    HVC_API_URL: "https://script.google.com/macros/s/AKfycbzKCvkaQ8sDBoYCTWd9K4Rt9L4MPK3p1llGZwDT5nd5E33NeRen1l973EtFQyI42FvQ/exec",
 
     // Hardcoded ranges since they are static
     ranges: {
@@ -1593,6 +1591,7 @@ const savePatientChanges = triggerSave;
 
 var csvData = [];
 var csvHeaders = [];
+var importQueue = []; // New: Queue for multiple files { name, data, headers, ward: '' }
 
 function openImportModal() {
     document.getElementById('import-modal').classList.remove('hidden');
@@ -1604,7 +1603,11 @@ function openImportModal() {
     document.getElementById('btn-start-import').disabled = true;
     document.getElementById('btn-start-import').classList.add('cursor-not-allowed', 'bg-slate-300');
     document.getElementById('btn-start-import').classList.remove('bg-medical-600', 'hover:bg-medical-700');
+    document.getElementById('btn-start-import').classList.remove('bg-medical-600', 'hover:bg-medical-700');
     document.getElementById('paste-input').value = "";
+    document.getElementById('import-file-list').classList.add('hidden');
+    document.getElementById('import-file-list').innerHTML = '';
+    importQueue = [];
 
     // Also reset Paste Button
     const btnParams = document.getElementById('btn-process-paste');
@@ -1619,56 +1622,219 @@ function closeImportModal() {
     document.getElementById('import-modal').classList.add('hidden');
 }
 
-function handleFileSelect(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+async function handleFileSelect(event) {
+    const files = Array.from(event.target.files);
+    if (!files.length) return;
 
+    // Show List Container
+    document.getElementById('import-file-list').classList.remove('hidden');
 
-    if (file.name.endsWith('.csv')) {
-        Papa.parse(file, {
-            header: true,
-            skipEmptyLines: true,
-            complete: function (results) {
-                csvData = results.data;
-                csvHeaders = results.meta.fields;
-                showMappingStep();
-            },
-            error: function (err) {
-                alert("Error parsing CSV: " + err.message);
+    for (const file of files) {
+        try {
+            const result = await readFile(file);
+            // Smart Ward Detection
+            let detectedWard = "";
+            const lowerName = file.name.toLowerCase();
+
+            // Advanced Heuristics for Ward Detection
+            // tr -> Treatment Room
+            // h -> Hematology
+            // s -> Surgical
+            // m -> Medical
+            // icu -> ICU
+            // Use word boundaries (\b) to avoid false positives (e.g. 'theme' shouldn't match 'h')
+
+            if (/\bicu\b|icu/i.test(lowerName)) {
+                detectedWard = 'ICU';
+            } else if (/\btr\b|treatment/i.test(lowerName)) {
+                detectedWard = 'Treatment Room';
+            } else if (/\bh\b|hem|hematology/i.test(lowerName)) {
+                detectedWard = 'Hematology';
+            } else if (/\bs\b|surg|surgical|10s|11s/i.test(lowerName)) {
+                detectedWard = 'Surgical';
+            } else if (/\bm\b|med|medical|10m|11m/i.test(lowerName)) {
+                detectedWard = 'Medical';
             }
-        });
-    } else if (file.name.match(/\.xlsx?$|\.xls$/)) {
-        const reader = new FileReader();
-        reader.onload = function (e) {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
 
-            const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            // If we have sections loaded, try to match more precisely? 
+            // For now, rely on user or basic keywords.
 
-            if (json.length === 0) {
-                alert("Excel file is empty");
+            importQueue.push({
+                id: Date.now() + Math.random(),
+                name: file.name,
+                data: result.data,
+                headers: result.headers,
+                ward: detectedWard
+            });
+        } catch (err) {
+            console.error(`Error reading ${file.name}:`, err);
+            alert(`Failed to read ${file.name}: ${err.message}`);
+        }
+    }
+
+    renderImportList();
+
+    // Auto-advance logic removed to allow Ward selection
+    if (importQueue.length > 0 && csvHeaders.length === 0) {
+        csvHeaders = importQueue[0].headers;
+    }
+}
+
+function readFile(file) {
+    return new Promise((resolve, reject) => {
+        const processRows = (rows) => {
+            // Header Hunting
+            const headerIndex = findHeaderRow(rows);
+            console.log(`[Import] File: ${file.name}, Detected Header Row: ${headerIndex}`);
+
+            if (headerIndex === -1) {
+                reject(new Error("Could not detect valid data headers."));
                 return;
             }
 
-            const headers = json[0];
-            const rows = json.slice(1);
+            const headers = rows[headerIndex];
+            const rawData = rows.slice(headerIndex + 1);
 
-            csvHeaders = headers;
-            csvData = rows.map(row => {
+            const data = rawData.map(row => {
                 let obj = {};
                 headers.forEach((h, i) => {
-                    obj[h] = row[i];
+                    if (h) obj[h] = row[i];
                 });
                 return obj;
             });
 
-            showMappingStep();
+            resolve({ data: data, headers: headers });
         };
-        reader.readAsArrayBuffer(file);
-    } else {
-        alert("Unsupported file format. Please use .csv or .xlsx");
+
+        if (file.name.endsWith('.csv')) {
+            Papa.parse(file, {
+                header: false, // Parse as arrays first to find header
+                skipEmptyLines: true,
+                complete: function (results) {
+                    processRows(results.data);
+                },
+                error: function (err) {
+                    reject(err);
+                }
+            });
+        } else if (file.name.match(/\.xlsx?$|\.xls$/)) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 }); // array of arrays
+
+                    if (json.length === 0) throw new Error("File empty");
+                    processRows(json);
+                } catch (e) {
+                    reject(e);
+                }
+            };
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(file);
+        } else {
+            reject(new Error("Unsupported format"));
+        }
+    });
+}
+
+function findHeaderRow(rows) {
+    // Keywords often found in patient list headers
+    const keywords = ['name', 'patient', 'id', 'mrn', 'code', 'ward', 'unit', 'age', 'gender', 'sex', 'diagnosis', 'admitted', 'date', 'provider', 'doctor'];
+
+    let bestRowIndex = -1;
+    let maxScore = 0;
+
+    // Scan first 15 rows
+    const limit = Math.min(rows.length, 15);
+
+    for (let i = 0; i < limit; i++) {
+        const row = rows[i];
+        if (!row || !Array.isArray(row)) continue;
+
+        let score = 0;
+        row.forEach(cell => {
+            if (cell && typeof cell === 'string') {
+                const val = cell.toLowerCase().trim();
+                // Check exact keyword match or partial
+                if (keywords.some(k => val.includes(k))) {
+                    score++;
+                }
+            }
+        });
+
+        if (score > maxScore) {
+            maxScore = score;
+            bestRowIndex = i;
+        }
+    }
+
+    if (bestRowIndex === -1 && rows.length > 0) return 0; // Default to first row
+
+    return bestRowIndex;
+}
+
+
+function renderImportQueue() {
+    const list = document.getElementById('import-file-list');
+    list.innerHTML = '';
+
+    // Generate Ward Options
+    // Standard + Persistent Sections
+    const possibleWards = ['Medical', 'Surgical', 'ICU', 'Hematology', 'Treatment Room'];
+    if (appData.sections) {
+        appData.sections.forEach(s => {
+            if (!possibleWards.includes(s.name)) possibleWards.push(s.name);
+        });
+    }
+
+    importQueue.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = "flex items-center gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm";
+
+        const wardOpts = possibleWards.map(w =>
+            `<option value="${w}" ${item.ward === w ? 'selected' : ''}>${w}</option>`
+        ).join('');
+
+        div.innerHTML = `
+            <div class="w-8 h-8 rounded bg-green-100 text-green-600 flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-file-excel"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="font-bold text-slate-700 truncate">${item.name}</p>
+                <p class="text-xs text-slate-400">${item.data.length} rows</p>
+            </div>
+            <select onchange="updateQueueWard(${index}, this.value)" 
+                class="bg-white border border-slate-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-medical-500 outline-none w-32">
+                <option value="">(Ward)</option>
+                ${wardOpts}
+            </select>
+            <button onclick="removeFromQueue(${index})" class="text-slate-400 hover:text-red-500 px-2">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        `;
+        list.appendChild(div);
+    });
+}
+
+function updateQueueWard(index, val) {
+    if (importQueue[index]) importQueue[index].ward = val;
+}
+
+function removeFromQueue(index) {
+    importQueue.splice(index, 1);
+    renderImportList();
+    if (importQueue.length === 0) {
+        // Reset if empty
+        document.getElementById('import-step-2').classList.add('hidden');
+        document.getElementById('import-step-1').classList.remove('hidden');
+        document.getElementById('import-file-list').classList.add('hidden');
+        const actions = document.getElementById('import-step-1-actions');
+        if (actions) actions.classList.add('hidden');
+        csvHeaders = [];
     }
 }
 
@@ -1758,31 +1924,40 @@ function renderMappingTable() {
         tr.className = "hover:bg-slate-50";
 
         let selectedHeader = "";
-        const lowerLabel = field.label.toLowerCase();
-        const lowerKey = field.key.toLowerCase();
         const aliases = field.aliases || [];
 
+        // Helper: normalize string for comparison (remove spaces, punctuation, lowercase)
+        const normalize = str => str.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        const normLabel = normalize(field.label);
+        const normKey = normalize(field.key);
+
         // Find best match in CSV headers
-        csvHeaders.forEach(h => {
-            const lowerH = h.toLowerCase();
+        // Priority: Exact normalization match > Partial match
+        for (const h of csvHeaders) {
+            const normH = normalize(h);
 
-            // 1. Exact Match
-            if (lowerH === lowerKey || lowerH === lowerLabel) {
+            // 1. Check against Key/Label
+            if (normH === normKey || normH === normLabel) {
                 selectedHeader = h;
-                return;
+                break;
             }
 
-            // 2. Alias Match (Word Boundary)
-            // prevent "id" matching "provider"
-            if (aliases.some(a => {
-                // Escape special regex chars if any
-                const escapedAlias = a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const regex = new RegExp(`(^|[^a-z0-9])${escapedAlias}([^a-z0-9]|$)`, 'i');
-                return regex.test(lowerH);
-            })) {
+            // 2. Check Aliases
+            if (aliases.some(alias => normalize(alias) === normH)) {
                 selectedHeader = h;
+                break;
             }
-        });
+
+            // 3. Fuzzy Contains (only if robust match usually fails)
+            // e.g. "Patient Name (Full)" -> matches "patientname"
+            if (aliases.some(alias => normH.includes(normalize(alias)))) {
+                selectedHeader = h;
+                // Don't break immediately, prioritize exact if found later? 
+                // meaningful enough for now.
+                break;
+            }
+        }
 
         const options = csvHeaders.map(h => `<option value="${h}" ${h === selectedHeader ? 'selected' : ''}>${h}</option>`).join('');
 
@@ -1811,30 +1986,67 @@ async function startImport() {
         }
     });
 
-    const newPatients = csvData.map(row => {
-        const p = {};
-        Object.keys(mapping).forEach(key => {
-            p[key] = row[mapping[key]];
+    let allPatients = [];
+
+    // Process Queue
+    if (importQueue.length > 0) {
+        importQueue.forEach(fileItem => {
+            const filePatients = fileItem.data.map(row => {
+                const p = {};
+                Object.keys(mapping).forEach(key => {
+                    p[key] = row[mapping[key]];
+                });
+
+                // Priority: Queue Ward > Current Ward > Current Row Ward (mapped)
+                if (fileItem.ward) {
+                    p.ward = fileItem.ward;
+                } else if ((!p.ward || p.ward === '') && appData.currentWard && appData.currentWard !== 'Unassigned') {
+                    p.ward = appData.currentWard;
+                }
+
+                p.id = Date.now().toString() + Math.random().toString().slice(2, 5);
+                p.labs = p.labs || {};
+                p.symptoms = p.symptoms || {};
+                p.notes = p.notes || "";
+                return p;
+            }).filter(p => p.name || p.code); // Filter out empty rows
+
+            allPatients = allPatients.concat(filePatients);
         });
+    } else {
+        // Fallback for Paste flow (uses legacy csvData)
+        if (csvData.length > 0) {
+            allPatients = csvData.map(row => {
+                const p = {};
+                Object.keys(mapping).forEach(key => {
+                    p[key] = row[mapping[key]];
+                });
 
-        // Context Aware: Ward
-        if ((!p.ward || p.ward === '') && appData.currentWard && appData.currentWard !== 'Unassigned') {
-            p.ward = appData.currentWard;
+                if ((!p.ward || p.ward === '') && appData.currentWard && appData.currentWard !== 'Unassigned') {
+                    p.ward = appData.currentWard;
+                }
+
+                p.id = Date.now().toString() + Math.random().toString().slice(2, 5);
+                p.labs = p.labs || {};
+                p.symptoms = p.symptoms || {};
+                p.notes = p.notes || "";
+                return p;
+            }).filter(p => p.name || p.code); // Filter out empty rows
         }
+    }
 
-        p.id = Date.now().toString() + Math.random().toString().slice(2, 5);
-        p.labs = p.labs || {};
-        p.symptoms = p.symptoms || {};
-        p.notes = p.notes || "";
-        return p;
-    });
+    if (allPatients.length === 0) {
+        alert("No patient data to import.");
+        closeImportModal();
+        return;
+    }
 
-    document.getElementById('import-status-text').innerText = `Uploading ${newPatients.length} patients...`;
+    document.getElementById('import-status-text').innerText = `Uploading ${allPatients.length} patients...`;
 
     try {
         const payload = {
             action: 'import',
-            patients: newPatients
+            patients: allPatients
         };
 
         // DEBUG: Check payload
@@ -4781,92 +4993,6 @@ async function handleLabsImageUpload(file) {
 // INTEGRATION: External App Handoffs (HVC & PE)
 // ==========================================
 
-// ==========================================
-// HVC FORM LOGIC
-// ==========================================
-
-// ==========================================
-// HVC FORM LOGIC (Integrated from HVC App)
-// ==========================================
-
-function toggleDeathFields(select) {
-    const isDead = select.value === 'Died';
-    document.querySelectorAll('.death-field').forEach(el => {
-        if (isDead) {
-            el.classList.remove('hidden');
-        } else {
-            el.classList.add('hidden');
-        }
-    });
-}
-
-async function handleHVCSubmit(e) {
-    e.preventDefault();
-    const form = e.target;
-    const btn = form.querySelector('button[type="submit"]');
-    const status = document.getElementById('hvc-status');
-
-    // UI Loading State
-    const originalBtnText = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Sending...';
-    status.classList.remove('hidden');
-
-    // Collect Data using FormData (Robust & Matches HVC App)
-    const formData = new FormData(form);
-    const data = {};
-    formData.forEach((value, key) => data[key] = value);
-
-    // Default Values / Cleanup
-    if (!data['Pt file Num.']) data['Pt file Num.'] = "TEMP-" + Date.now();
-    if (!data['number of visits']) data['number of visits'] = 0;
-
-    // Wrap in action property for backend routing
-    const payload = {
-        action: 'register',
-        data: data
-    };
-
-    console.log("HVC Final Payload:", JSON.stringify(payload, null, 2));
-
-    try {
-        // Use HVC_API_URL defined in global const
-        const response = await fetch(HVC_API_URL, {
-            method: 'POST',
-            body: JSON.stringify(payload) // Send wrapped payload
-            // No-CORS mode is default behavior for simple POSTs to GAS if not specified, 
-            // but usually we want to read response if possible. 
-            // However, GAS 'doPost' usually requires 'application/json' or text/plain.
-            // main.js standard fetch implies text/plain usually to avoid preflight if not set.
-            // Let's stick to simple fetch as commonly used with GAS.
-        });
-
-        const result = await response.json();
-        console.log("HVC Backend Response:", result);
-
-        if (result.status === 'success') {
-            showToast("Patient Registered to HVC App!", "success");
-            form.reset();
-            closeHVCModal();
-            // Refresh patient list if necessary
-            if (typeof fetchHVCPatients === 'function') fetchHVCPatients();
-        } else {
-            throw new Error(result.error || result.message || "Unknown error");
-        }
-
-    } catch (error) {
-        console.error("HVC Submit Error:", error);
-        showToast("Error: " + error.message, "error");
-    } finally {
-        // Reset UI
-        btn.disabled = false;
-        btn.innerHTML = originalBtnText;
-        status.classList.add('hidden');
-    }
-}
-
-
-
 /**
  * Builds the URL Query String from Patient Data
  */
@@ -4951,29 +5077,14 @@ function fetchHVCPatients() {
 // --- Home Visit Logic ---
 
 function openHVCModal() {
-    // Clear all fields first
-    const fieldsToClear = [
-        'hvc-name', 'hvc-id', 'hvc-gender', 'hvc-age', 'hvc-phone', 'hvc-social',
-        'hvc-city', 'hvc-address', 'hvc-hospital', 'hvc-doctor', 'hvc-diagnosis-cat',
-        'hvc-diagnosis-detail', 'hvc-opioid', 'hvc-priority', 'hvc-ecog', 'hvc-ppi',
-        'hvc-pps', 'hvc-intent', 'hvc-survival', 'hvc-date-death', 'hvc-stage',
-        'hvc-site-referral', 'hvc-date-reg'
-    ];
-    fieldsToClear.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.value = '';
-    });
+    if (!appData.currentPatient) return;
+    const p = appData.currentPatient;
 
-    // Pre-fill if patient selected
-    if (appData.currentPatient) {
-        document.getElementById('hvc-name').value = appData.currentPatient.name || '';
-        document.getElementById('hvc-id').value = appData.currentPatient.code || '';
-        document.getElementById('hvc-age').value = parseInt(appData.currentPatient.age) || '';
-        document.getElementById('hvc-diagnosis-detail').value = appData.currentPatient.diagnosis || '';
-        document.getElementById('hvc-phone').value = appData.currentPatient.phone || '';
-        // Try to map existing fields if available
-    }
-    // Always set registration date to today
+    // Pre-fill
+    document.getElementById('hvc-name').value = p.name || '';
+    document.getElementById('hvc-id').value = p.code || ''; // File Num
+    document.getElementById('hvc-age').value = p.age || '';
+    document.getElementById('hvc-diagnosis-detail').value = p.diagnosis || '';
     document.getElementById('hvc-date-reg').valueAsDate = new Date();
 
     // Show
@@ -4985,7 +5096,75 @@ function closeHVCModal() {
     document.getElementById('hvc-modal').classList.add('hidden');
 }
 
+async function submitHVCForm() {
+    const btn = document.querySelector('#hvc-modal button[onclick="submitHVCForm()"]');
+    const statusDiv = document.getElementById('hvc-status');
 
+    // UI Loading
+    btn.disabled = true;
+    btn.classList.add('opacity-50');
+    statusDiv.classList.remove('hidden');
+
+    // FIXED: Action must be 'register' to match Backend
+    const payload = {
+        action: 'register',
+        data: {
+            'Pt Name': document.getElementById('hvc-name').value,
+            'Pt file Num.': document.getElementById('hvc-id').value,
+            'Gender': document.getElementById('hvc-gender').value,
+            'Age': document.getElementById('hvc-age').value,
+            'phone No.': document.getElementById('hvc-phone').value,
+            'Social Status': document.getElementById('hvc-social').value,
+            'City/Area (Adress)': document.getElementById('hvc-city').value,
+            'Specific Home Address': document.getElementById('hvc-address').value,
+            'Hospital': document.getElementById('hvc-hospital').value,
+            'Primary Physician': document.getElementById('hvc-doctor').value,
+            'Diagnosis': document.getElementById('hvc-diagnosis-cat').value,
+            'Specific Diagnosis': document.getElementById('hvc-diagnosis-detail').value,
+            'Opioid?': document.getElementById('hvc-opioid').value,
+            'Priority': document.getElementById('hvc-priority').value,
+            'ECGO': document.getElementById('hvc-ecog').value,
+            'PPI': document.getElementById('hvc-ppi').value,
+            'PPS': document.getElementById('hvc-pps').value,
+            'Registration Date': document.getElementById('hvc-date-reg').value,
+            'Servival Status': 'Alive'
+        }
+    };
+
+    try {
+        await fetch(HVC_API_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        saveQuickPlan('referral', `Registered in HVC: ${payload.data['Pt Name']}`);
+
+        // Update Local State (Immediate Feedback)
+        const newId = document.getElementById('hvc-id').value;
+        if (newId && appData.hvcList) {
+            appData.hvcList.push(String(newId).trim());
+            // Re-render if grid is active
+            if (appData.currentWard && appData.wards && appData.wards[appData.currentWard]) {
+                if (typeof renderPatientsGrid === 'function') {
+                    renderPatientsGrid(appData.wards[appData.currentWard]);
+                }
+            }
+        }
+
+        closeHVCModal();
+        alert("Patient registered in Home Visit system successfully!");
+
+    } catch (e) {
+        console.error("HVC Submit Error", e);
+        alert("Failed to submit to Home Visit App. Check console.");
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('opacity-50');
+        statusDiv.classList.add('hidden');
+    }
+}
 
 
 // --- Equipment Logic ---
@@ -5070,44 +5249,63 @@ async function submitPEForm() {
 }
 
 // Global Exports
-// --- Toast Notification ---
-function showToast(message, type = 'success') {
-    // Create toast element if not exists
-    let toast = document.getElementById('toast-notification');
-    if (!toast) {
-        toast = document.createElement('div');
-        toast.id = 'toast-notification';
-        toast.className = 'fixed bottom-10 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-xl text-white font-medium transition-all duration-300 opacity-0 z-50 flex items-center gap-2';
-        document.body.appendChild(toast);
-    }
-
-    // specific styles
-    if (type === 'success') {
-        toast.className = 'fixed bottom-10 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-xl bg-slate-800 text-white font-medium transition-all duration-300 opacity-100 translate-y-0 z-50 flex items-center gap-2';
-        toast.innerHTML = '<i class="fa-solid fa-check-circle text-green-400"></i> ' + message;
-    } else {
-        toast.className = 'fixed bottom-10 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-xl bg-red-600 text-white font-medium transition-all duration-300 opacity-100 translate-y-0 z-50 flex items-center gap-2';
-        toast.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> ' + message;
-    }
-
-    // Show
-    setTimeout(() => {
-        toast.classList.add('opacity-0');
-        toast.classList.add('translate-y-4');
-        setTimeout(() => {
-            // keep element but hide
-            toast.className = 'fixed bottom-10 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-xl text-white font-medium transition-all duration-300 opacity-0 translate-y-4 z-50 flex items-center gap-2 pointer-events-none';
-        }, 300);
-    }, 3000);
-}
-
-// Global Exports
 window.openHVCModal = openHVCModal;
 window.closeHVCModal = closeHVCModal;
-window.handleHVCSubmit = handleHVCSubmit; // Export new function
+window.submitHVCForm = submitHVCForm;
 window.openPEModal = openPEModal;
 window.closePEModal = closePEModal;
 window.submitPEForm = submitPEForm;
-window.showToast = showToast;
 
+
+
+function renderImportList() {
+    const list = document.getElementById('import-file-list');
+    list.innerHTML = '';
+
+    // Generate Ward Options
+    const possibleWards = ['Medical', 'Surgical', 'ICU', 'Hematology', 'Treatment Room'];
+    if (appData.sections) {
+        appData.sections.forEach(s => {
+            if (!possibleWards.includes(s.name)) possibleWards.push(s.name);
+        });
+    }
+
+    importQueue.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = "flex items-center gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm";
+
+        const wardOpts = possibleWards.map(w =>
+            `<option value="${w}" ${item.ward === w ? 'selected' : ''}>${w}</option>`
+        ).join('');
+
+        div.innerHTML = `
+            <div class="w-8 h-8 rounded bg-green-100 text-green-600 flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-file-excel"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="font-bold text-slate-700 truncate">${item.name}</p>
+                <p class="text-xs text-slate-400">${item.data.length} rows</p>
+            </div>
+            <select onchange="updateQueueWard(${index}, this.value)" 
+                class="bg-white border border-slate-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-medical-500 outline-none w-32">
+                <option value="">(Ward)</option>
+                ${wardOpts}
+            </select>
+            <button onclick="removeFromQueue(${index})" class="text-slate-400 hover:text-red-500 px-2">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        `;
+        list.appendChild(div);
+    });
+
+    // Show/Hide Next Button
+    const actions = document.getElementById('import-step-1-actions');
+    if (actions) {
+        if (importQueue.length > 0) {
+            actions.classList.remove('hidden');
+        } else {
+            actions.classList.add('hidden');
+        }
+    }
+}
 

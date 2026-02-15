@@ -95,6 +95,9 @@ function doPost(e) {
         case 'save_metadata':
            result = handleSaveMetadata(data.metadata);
            break;
+        case 'save_notes':
+           result = handleSaveNotes(data.notes);
+           break;
         case 'get_analytics':
            result = handleGetAnalyticsData();
            break;
@@ -738,6 +741,38 @@ function handleSaveMetadata(newMeta) {
   }
   
   return { status: 'success' };
+}
+
+function handleSaveNotes(notes) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Notes');
+  if (!sheet) {
+    sheet = ss.insertSheet('Notes');
+  }
+  
+  // Headers
+  var headers = ['id', 'title', 'type', 'content', 'date', 'updatedAt'];
+  
+  // Convert Objects to Rows
+  var rows = [];
+  if (notes && Array.isArray(notes)) {
+      rows = notes.map(function(n) {
+          return headers.map(function(h) {
+              var val = n[h];
+              if (typeof val === 'object' && val !== null) return JSON.stringify(val);
+              return val || '';
+          });
+      });
+  }
+  
+  // Wipe and Rewrite
+  sheet.clear();
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  if (rows.length > 0) {
+      sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+  }
+  
+  return { status: 'success', count: rows.length };
 }
 
 

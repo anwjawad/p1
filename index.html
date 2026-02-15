@@ -99,35 +99,8 @@
 
         body.theme-dark .bg-slate-50 {
             background-color: #0f172a !important;
-        }
-
-        /* HVC App Styles Ported */
-        .glass-card {
-            background: rgba(255, 255, 255, 0.6);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.4);
-        }
-
-        .input-field {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            border-radius: 0.75rem;
-            background-color: rgba(255, 255, 255, 0.5);
-            border: 1px solid #e2e8f0;
-            outline: none;
-            transition: all 0.2s;
-        }
-
-        .input-field:focus {
-            background-color: #ffffff;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-
-        background-color: #0f172a !important;
-        color: #cbd5e1;
-        border-color: #334155 !important;
+            color: #cbd5e1;
+            border-color: #334155 !important;
         }
 
         body.theme-dark .text-slate-800 {
@@ -613,26 +586,75 @@
                     class="w-full mt-2 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
                     <i class="fa-solid fa-clock-rotate-left mr-2"></i> History
                 </button>
+                <button onclick="openNotesView()"
+                    class="w-full mt-2 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
+                    <i class="fa-solid fa-sticky-note mr-2"></i> Meeting Notes
+                </button>
             </div>
         </aside>
 
         <!-- Main Content -->
         <main class="flex-1 overflow-y-auto bg-slate-50 p-6 relative">
-            <header class="flex justify-between items-end mb-6">
-                <div>
-                    <h2 id="current-ward-title" class="text-2xl font-bold text-slate-800">Dashboard</h2>
-                    <p class="text-slate-500 text-sm mt-1">Select a ward to view patients</p>
-                </div>
-                <div class="flex gap-2">
-                    <span
-                        class="px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-medium text-slate-600">Total:
-                        <span id="patient-count">0</span></span>
-                </div>
-            </header>
+            <div id="patient-grid-container">
+                <header class="flex justify-between items-end mb-6">
+                    <div>
+                        <h2 id="current-ward-title" class="text-2xl font-bold text-slate-800">Dashboard</h2>
+                        <p class="text-slate-500 text-sm mt-1">Select a ward to view patients</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <span
+                            class="px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-medium text-slate-600">Total:
+                            <span id="patient-count">0</span></span>
+                    </div>
+                </header>
 
-            <!-- Cards Grid -->
-            <div id="patients-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-20">
-                <!-- Cards injected via JS -->
+                <!-- Cards Grid -->
+                <div id="patients-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-20">
+                    <!-- Cards injected via JS -->
+                </div>
+            </div>
+
+            <!-- Notes View -->
+            <div id="notes-view" class="hidden space-y-6">
+                <!-- Notes Toolbar -->
+                <div
+                    class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                    <div class="flex items-center gap-4 flex-1">
+                        <div class="relative w-full max-w-md">
+                            <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                            <input type="text" id="notes-search" placeholder="Search notes..."
+                                class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-medical-500">
+                        </div>
+                        <select id="notes-filter-type"
+                            class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-medical-500">
+                            <option value="all">All Types</option>
+                            <option value="meeting">Meeting</option>
+                            <option value="study">Study</option>
+                            <option value="pearl">Clinical Pearl</option>
+                            <option value="guideline">Guideline</option>
+                        </select>
+                    </div>
+                    <button onclick="openNoteEditor()"
+                        class="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center gap-2">
+                        <i class="fa-solid fa-plus"></i> New Note
+                    </button>
+                </div>
+
+                <!-- Notes Grid (Masonry-like) -->
+                <div id="notes-grid"
+                    class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
+                    <!-- Notes injected here -->
+                </div>
+
+                <!-- Empty State -->
+                <div id="notes-empty-state" class="hidden flex flex-col items-center justify-center py-20 text-center">
+                    <div class="w-20 h-20 bg-yellow-50 rounded-full flex items-center justify-center mb-4">
+                        <i class="fa-regular fa-note-sticky text-3xl text-yellow-400"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-700">No notes yet</h3>
+                    <p class="text-slate-500 max-w-sm">Capture meeting minutes, study notes, or clinical pearls here.
+                    </p>
+                </div>
             </div>
         </main>
 
@@ -981,9 +1003,22 @@
                     <div class="text-center py-6 border-2 border-dashed border-slate-200 rounded-xl hover:border-medical-400 hover:bg-slate-50 transition-colors cursor-pointer"
                         onclick="document.getElementById('csv-file-input').click()">
                         <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-300 mb-2"></i>
-                        <p class="text-slate-600 font-medium text-sm">Upload Excel / CSV</p>
-                        <input type="file" id="csv-file-input" class="hidden" accept=".csv, .xlsx, .xls"
+                        <p class="text-slate-600 font-medium text-sm">Upload Excel / CSV (Multiple Allowed)</p>
+                        <input type="file" id="csv-file-input" class="hidden" accept=".csv, .xlsx, .xls" multiple
                             onchange="handleFileSelect(event)">
+                    </div>
+
+                    <!-- File List Container -->
+                    <div id="import-file-list" class="space-y-2 max-h-60 overflow-y-auto hidden">
+                        <!-- File Items injected here -->
+                    </div>
+
+                    <!-- Step 1 Actions -->
+                    <div id="import-step-1-actions" class="hidden mt-4 text-right">
+                        <button onclick="showMappingStep()"
+                            class="bg-medical-600 hover:bg-medical-700 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                            Continue to Mapping <i class="fa-solid fa-arrow-right ml-2"></i>
+                        </button>
                     </div>
 
                     <div class="relative">
@@ -2046,307 +2081,216 @@
                         class="fa-solid fa-times"></i></button>
             </div>
 
-            <!-- Body -->
-            <div class="flex-1 overflow-y-auto p-6 bg-slate-50/50">
-                <!-- HVC App Form Logic Injected -->
-                <div class="glass-card p-8 rounded-3xl border border-white/50 shadow-xl">
-                    <form id="hvc-reg-form" class="space-y-8" onsubmit="handleHVCSubmit(event)">
-                        <!-- Section 1: Demographics -->
-                        <div>
-                            <h3 class="text-lg font-semibold text-blue-600 mb-4 flex items-center gap-2">
-                                <i class="fa-regular fa-id-card"></i> Demographics
-                            </h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Pt Name</label>
-                                    <input type="text" name="Pt Name" id="hvc-name" required class="input-field"
-                                        placeholder="Full Name">
-                                </div>
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Pt file Num.</label>
-                                    <input type="text" name="Pt file Num." id="hvc-id" required class="input-field"
-                                        placeholder="ID / File No.">
-                                </div>
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Gender</label>
-                                    <select name="Gender" id="hvc-gender" class="input-field">
-                                        <option value="">Select...</option>
-                                        <option value="Male">Male</option>
-                                        <option value="Female">Female</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Age</label>
-                                    <input type="number" name="Age" id="hvc-age" class="input-field"
-                                        placeholder="Years">
-                                </div>
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">phone No.</label>
-                                    <input type="tel" name="phone No." id="hvc-phone" class="input-field"
-                                        placeholder="05...">
-                                </div>
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Social Status</label>
-                                    <select name="Social status" id="hvc-social" class="input-field">
-                                        <option value="">Select...</option>
-                                        <option value="Married">Married</option>
-                                        <option value="Single">Single</option>
-                                    </select>
-                                </div>
-                                <!-- Address Fields -->
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">City/Area
-                                        (Adress)</label>
-                                    <select name="Adress" id="hvc-city" class="input-field">
-                                        <option value="">Select Area...</option>
-                                        <option value="Hebron">Hebron</option>
-                                        <option value="Jericho">Jericho</option>
-                                        <option value="Jerusalem">Jerusalem</option>
-                                        <option value="Bethlehem">Bethlehem</option>
-                                        <option value="Ramallah">Ramallah</option>
-                                        <option value="Nablus">Nablus</option>
-                                        <option value="Jenin">Jenin</option>
-                                        <option value="Tulkarm">Tulkarm</option>
-                                        <option value="Qalqilya">Qalqilya</option>
-                                        <option value="Salfit">Salfit</option>
-                                    </select>
-                                </div>
-                                <div class="form-group md:col-span-2">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Specific Home
-                                        Address</label>
-                                    <input type="text" name="Home Address " id="hvc-address" class="input-field"
-                                        placeholder="Street, Building, details...">
-                                </div>
-                            </div>
+            <div class="flex-1 overflow-y-auto p-6 bg-slate-50/50 space-y-8">
+
+                <!-- Section 1: Demographics -->
+                <section>
+                    <h4 class="text-sm font-bold text-slate-600 uppercase mb-4 flex items-center gap-2"><i
+                            class="fa-solid fa-address-card"></i> Demographics</h4>
+                    <div
+                        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">Patient Name</label>
+                            <input type="text" id="hvc-name"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm">
                         </div>
-
-                        <div class="h-px bg-slate-200"></div>
-
-                        <!-- Section 2: Clinical Info -->
-                        <div>
-                            <h3 class="text-lg font-semibold text-purple-600 mb-4 flex items-center gap-2">
-                                <i class="fa-solid fa-stethoscope"></i> Clinical Info
-                            </h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Hospital</label>
-                                    <select name="Hospital" id="hvc-hospital" class="input-field">
-                                        <option value="">Select...</option>
-                                        <option value="AVH">AVH</option>
-                                        <option value="Service">Service</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Primary
-                                        Physician</label>
-                                    <select name="Primary Physicien" id="hvc-physician" class="input-field">
-                                        <option value="">Select Doctor...</option>
-                                        <option value="Amer Zughaier">Amer Zughaier</option>
-                                        <option value="Bashir Abu Aqeel">Bashir Abu Aqeel</option>
-                                        <option value="Fadel Rawashdeh">Fadel Rawashdeh</option>
-                                        <option value="Fadi Al Atrash">Fadi Al Atrash</option>
-                                        <option value="Farah Awad">Farah Awad</option>
-                                        <option value="Hamdi Janazreh">Hamdi Janazreh</option>
-                                        <option value="Hanna Qahoush">Hanna Qahoush</option>
-                                        <option value="Ibraheem Eid">Ibraheem Eid</option>
-                                        <option value="Jalal Qawasmi">Jalal Qawasmi</option>
-                                        <option value="Moath Badawi">Moath Badawi</option>
-                                        <option value="Ola Abu Laban">Ola Abu Laban</option>
-                                        <option value="Salem Ballan">Salem Ballan</option>
-                                        <option value="Waseem Sharabate">Waseem Sharabate</option>
-                                        <option value="Yousef Hammamreh">Yousef Hammamreh</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Diagnosis</label>
-                                    <select name="Diagnosis" id="hvc-diagnosis-cat" class="input-field">
-                                        <option value="">Select Diagnosis...</option>
-                                        <option value="Brain Cancers">Brain Cancers</option>
-                                        <option value="Breast Cancers">Breast Cancers</option>
-                                        <option value="Colorectal cancers">Colorectal cancers</option>
-                                        <option value="Endocrine Cancers">Endocrine Cancers</option>
-                                        <option value="Gastric Cancers">Gastric Cancers</option>
-                                        <option value="Genitourinary Cancers">Genitourinary Cancers</option>
-                                        <option value="Gynecological Cancers">Gynecological Cancers</option>
-                                        <option value="Head and Neck Cancers">Head and Neck Cancers</option>
-                                        <option value="Hematological cancer">Hematological cancer</option>
-                                        <option value="Lung Cancers">Lung Cancers</option>
-                                        <option value="Lymphomas">Lymphomas</option>
-                                        <option value="Panceriatic cancer">Panceriatic cancer</option>
-                                        <option value="Prostate Cancers">Prostate Cancers</option>
-                                        <option value="Rare and Mixed Cancers">Rare and Mixed Cancers</option>
-                                        <option value="Sarcomas">Sarcomas</option>
-                                    </select>
-                                </div>
-                                <div class="form-group md:col-span-2">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Specific
-                                        Diagnosis</label>
-                                    <input type="text" name="Specific Diagnosis" id="hvc-diagnosis-detail"
-                                        class="input-field" placeholder="Detail...">
-                                </div>
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Stage of
-                                        Disease</label>
-                                    <select name="Stage of Disease" id="hvc-stage" class="input-field">
-                                        <option value="">Select...</option>
-                                        <option value="NED">NED</option>
-                                        <option value="Stage 1">Stage 1</option>
-                                        <option value="Stage 2">Stage 2</option>
-                                        <option value="Stage 3">Stage 3</option>
-                                        <option value="Stage 4">Stage 4</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Intent of care</label>
-                                    <select name="Intent of care" id="hvc-intent" class="input-field">
-                                        <option value="">Select...</option>
-                                        <option value="Palliative Care">Palliative Care</option>
-                                        <option value="Curative">Curative</option>
-                                        <option value="End of Life">End of Life</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Opioid?</label>
-                                    <select name="opioid " id="hvc-opioid" class="input-field">
-                                        <option value="No">No</option>
-                                        <option value="Yes">Yes</option>
-                                    </select>
-                                </div>
-                            </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">File Num / ID</label>
+                            <input type="text" id="hvc-id"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm">
                         </div>
-
-                        <div class="h-px bg-slate-200"></div>
-
-                        <!-- Section 3: Status & Referral -->
-                        <div>
-                            <h3 class="text-lg font-semibold text-amber-600 mb-4 flex items-center gap-2">
-                                <i class="fa-solid fa-clipboard-check"></i> Status & Referral
-                            </h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Priority</label>
-                                    <select name="priority" id="hvc-priority" class="input-field">
-                                        <option value="">Select...</option>
-                                        <option value="1">1</option>
-                                        <option value="2">2</option>
-                                        <option value="3">3</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Site of
-                                        Referral</label>
-                                    <select name="Site of Referral" id="hvc-referral-site" class="input-field">
-                                        <option value="">Select...</option>
-                                        <option value="Primary Dr">Primary Dr</option>
-                                        <option value="Department">Department</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">ECOG</label>
-                                    <input type="number" name="ECOG" id="hvc-ecog" class="input-field" min="0" max="4">
-                                </div>
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">PPI</label>
-                                    <input type="number" name="PPI" id="hvc-ppi" class="input-field">
-                                </div>
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">PPS</label>
-                                    <input type="number" name="PPS" id="hvc-pps" class="input-field">
-                                </div>
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Number of
-                                        visits</label>
-                                    <input type="number" name="number of visits" id="hvc-visits" class="input-field"
-                                        value="0">
-                                </div>
-                            </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">Gender</label>
+                            <select id="hvc-gender"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white">
+                                <option value="">Select...</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                            </select>
                         </div>
-
-                        <div class="h-px bg-slate-200"></div>
-
-                        <!-- Section 4: Validation & Follow-up -->
-                        <div>
-                            <h3 class="text-lg font-semibold text-green-600 mb-4 flex items-center gap-2">
-                                <i class="fa-solid fa-calendar-check"></i> Dates & Validations
-                            </h3>
-                            <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Registration
-                                        Date</label>
-                                    <input type="date" name="date " id="hvc-date-reg" class="input-field">
-                                </div>
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">V1</label>
-                                    <input type="date" name="V1" id="hvc-v1" class="input-field">
-                                </div>
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">V2</label>
-                                    <input type="date" name="V2" id="hvc-v2" class="input-field">
-                                </div>
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">V3</label>
-                                    <input type="date" name="V3" id="hvc-v3" class="input-field">
-                                </div>
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">V4</label>
-                                    <input type="date" name="V4" id="hvc-v4" class="input-field">
-                                </div>
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">V5</label>
-                                    <input type="date" name="V5" id="hvc-v5" class="input-field">
-                                </div>
-                            </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">Age</label>
+                            <input type="number" id="hvc-age"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm">
                         </div>
-
-                        <div class="h-px bg-slate-200"></div>
-
-                        <!-- Section 5: Outcome -->
-                        <div>
-                            <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
-                                <i class="fa-solid fa-heart-pulse"></i> Outcome
-                            </h3>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div class="form-group">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Survival Status</label>
-                                    <select name="Servival Status" id="hvc-survival" class="input-field"
-                                        onchange="toggleDeathFields(this)">
-                                        <option value="">Select...</option>
-                                        <option value="Alive">Alive</option>
-                                        <option value="Died">Died</option>
-                                    </select>
-                                </div>
-                                <div class="form-group death-field hidden">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Date of death</label>
-                                    <input type="date" name="Date of death" id="hvc-date-death" class="input-field">
-                                </div>
-                                <div class="form-group death-field hidden">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Place of death</label>
-                                    <select name="Place of death" id="hvc-place-death" class="input-field">
-                                        <option value="">Select...</option>
-                                        <option value="AVH">AVH</option>
-                                        <option value="House">House</option>
-                                        <option value="Other Hospital">Other Hospital</option>
-                                    </select>
-                                </div>
-                            </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">Phone</label>
+                            <input type="text" id="hvc-phone"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm">
                         </div>
-
-                        <!-- Actions -->
-                        <div class="flex justify-end pt-4 gap-4">
-                            <!-- Status Indicator -->
-                            <div id="hvc-status"
-                                class="mr-auto text-sm font-bold text-slate-500 flex items-center hidden">
-                                <i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Sending...
-                            </div>
-                            <button type="button" onclick="document.getElementById('hvc-reg-form').reset()"
-                                class="px-6 py-3 rounded-xl text-slate-500 hover:bg-slate-100 transition-colors font-medium">Clear</button>
-                            <button type="submit"
-                                class="px-8 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transform hover:-translate-y-1 transition-all flex items-center gap-2">
-                                <i class="fa-solid fa-paper-plane"></i> Register Patient
-                            </button>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">Social Status</label>
+                            <select id="hvc-social"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white">
+                                <option value="">Select...</option>
+                                <option value="Married">Married</option>
+                                <option value="Single">Single</option>
+                            </select>
                         </div>
-                    </form>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">City / Area</label>
+                            <select id="hvc-city"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white">
+                                <option value="">Select Area...</option>
+                                <option value="Hebron">Hebron</option>
+                                <option value="Jericho">Jericho</option>
+                                <option value="Jerusalem">Jerusalem</option>
+                                <option value="Bethlehem">Bethlehem</option>
+                                <option value="Ramallah">Ramallah</option>
+                                <option value="Nablus">Nablus</option>
+                                <option value="Jenin">Jenin</option>
+                                <option value="Tulkarm">Tulkarm</option>
+                                <option value="Qalqilya">Qalqilya</option>
+                                <option value="Salfit">Salfit</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1 md:col-span-2 lg:col-span-1">
+                            <label class="text-xs font-bold text-slate-500">Specific Address</label>
+                            <input type="text" id="hvc-address"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm">
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section 2: Clinical Info -->
+                <section>
+                    <h4 class="text-sm font-bold text-slate-600 uppercase mb-4 flex items-center gap-2"><i
+                            class="fa-solid fa-stethoscope"></i> Clinical Info</h4>
+                    <div
+                        class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">Hospital</label>
+                            <select id="hvc-hospital"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white">
+                                <option value="">Select...</option>
+                                <option value="AVH">AVH</option>
+                                <option value="Service">Service</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">Primary Physician</label>
+                            <select id="hvc-doctor"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white">
+                                <option value="">Select Doctor...</option>
+                                <option value="Amer Zughaier">Amer Zughaier</option>
+                                <option value="Bashir Abu Aqeel">Bashir Abu Aqeel</option>
+                                <option value="Fadel Rawashdeh">Fadel Rawashdeh</option>
+                                <option value="Fadi Al Atrash">Fadi Al Atrash</option>
+                                <option value="Farah Awad">Farah Awad</option>
+                                <option value="Hamdi Janazreh">Hamdi Janazreh</option>
+                                <option value="Hanna Qahoush">Hanna Qahoush</option>
+                                <option value="Ibraheem Eid">Ibraheem Eid</option>
+                                <option value="Jalal Qawasmi">Jalal Qawasmi</option>
+                                <option value="Moath Badawi">Moath Badawi</option>
+                                <option value="Ola Abu Laban">Ola Abu Laban</option>
+                                <option value="Salem Ballan">Salem Ballan</option>
+                                <option value="Waseem Sharabate">Waseem Sharabate</option>
+                                <option value="Yousef Hammamreh">Yousef Hammamreh</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">Diagnosis (Category)</label>
+                            <select id="hvc-diagnosis-cat"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white">
+                                <option value="">Select Diagnosis...</option>
+                                <option value="Brain Cancers">Brain Cancers</option>
+                                <option value="Breast Cancers">Breast Cancers</option>
+                                <option value="Colorectal cancers">Colorectal cancers</option>
+                                <option value="Endocrine Cancers">Endocrine Cancers</option>
+                                <option value="Gastric Cancers">Gastric Cancers</option>
+                                <option value="Genitourinary Cancers">Genitourinary Cancers</option>
+                                <option value="Gynecological Cancers">Gynecological Cancers</option>
+                                <option value="Head and Neck Cancers">Head and Neck Cancers</option>
+                                <option value="Hematological cancer">Hematological cancer</option>
+                                <option value="Lung Cancers">Lung Cancers</option>
+                                <option value="Lymphomas">Lymphomas</option>
+                                <option value="Panceriatic cancer">Panceriatic cancer</option>
+                                <option value="Prostate Cancers">Prostate Cancers</option>
+                                <option value="Rare and Mixed Cancers">Rare and Mixed Cancers</option>
+                                <option value="Sarcomas">Sarcomas</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1 md:col-span-2">
+                            <label class="text-xs font-bold text-slate-500">Specific Diagnosis</label>
+                            <input type="text" id="hvc-diagnosis-detail"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">Opioid?</label>
+                            <select id="hvc-opioid"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white">
+                                <option value="No">No</option>
+                                <option value="Yes">Yes</option>
+                            </select>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section 3: Status -->
+                <section>
+                    <h4 class="text-sm font-bold text-slate-600 uppercase mb-4 flex items-center gap-2"><i
+                            class="fa-solid fa-file-contract"></i> Status & Referral</h4>
+                    <div
+                        class="grid grid-cols-2 md:grid-cols-4 gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">Priority</label>
+                            <select id="hvc-priority"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white">
+                                <option value="">Select...</option>
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">ECOG</label>
+                            <input type="text" id="hvc-ecog"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">PPI</label>
+                            <input type="text" id="hvc-ppi"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">PPS</label>
+                            <input type="text" id="hvc-pps"
+                                class="w-full p-2 border border-slate-200 rounded-lg text-sm">
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section 4: Dates -->
+                <section>
+                    <h4 class="text-sm font-bold text-slate-600 uppercase mb-4 flex items-center gap-2"><i
+                            class="fa-solid fa-calendar-days"></i> Dates</h4>
+                    <div
+                        class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">Registration</label>
+                            <input type="date" id="hvc-date-reg"
+                                class="w-full p-1 border border-slate-200 rounded text-xs">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-500">First Vist</label>
+                            <input type="date" id="hvc-date-v1"
+                                class="w-full p-1 border border-slate-200 rounded text-xs">
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+
+            <div class="px-6 py-4 border-t border-slate-100 bg-white rounded-b-2xl flex justify-end gap-3">
+                <div id="hvc-status" class="mr-auto text-sm font-bold text-slate-500 flex items-center hidden">
+                    <i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Sending to HVC App...
                 </div>
+                <button onclick="closeHVCModal()"
+                    class="px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-lg border border-transparent font-medium">Cancel</button>
+                <button onclick="submitHVCForm()"
+                    class="px-6 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg shadow-lg shadow-rose-200 flex items-center gap-2">
+                    <i class="fa-solid fa-paper-plane"></i> Register Patient
+                </button>
             </div>
         </div>
     </div>
@@ -2492,6 +2436,99 @@
             </div>
         </div>
     </div>
+    <!-- Note Editor Modal -->
+    <div id="note-editor-modal" class="fixed inset-0 z-[80] hidden flex items-center justify-center fade-in">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeNoteEditor()"></div>
+        <div
+            class="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-4 my-6 flex flex-col max-h-[90vh] animate-entry">
+
+            <!-- Header -->
+            <div
+                class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
+                <div>
+                    <input type="text" id="note-title-input" placeholder="Note Title..."
+                        class="bg-transparent text-xl font-bold text-slate-800 placeholder-slate-400 focus:outline-none w-full border-b border-transparent focus:border-slate-300 transition-colors">
+                    <div class="flex items-center gap-3 mt-1">
+                        <span id="note-date-display" class="text-xs text-slate-400 font-mono"></span>
+                        <select id="note-type-select"
+                            class="text-xs font-bold bg-white border border-slate-200 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-medical-500">
+                            <option value="meeting">Meeting Note</option>
+                            <option value="study">Study Topic</option>
+                            <option value="pearl">Clinical Pearl</option>
+                            <option value="guideline">Guideline</option>
+                        </select>
+                    </div>
+                </div>
+                <button onclick="closeNoteEditor()"
+                    class="text-slate-400 hover:text-slate-600 text-xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 transition-colors">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Editor Toolbar (Simple) -->
+            <div class="px-4 py-2 bg-slate-50 border-b border-slate-100 flex gap-2 overflow-x-auto">
+                <button onclick="document.execCommand('bold')"
+                    class="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded" title="Bold"><i
+                        class="fa-solid fa-bold"></i></button>
+                <button onclick="document.execCommand('italic')"
+                    class="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded" title="Italic"><i
+                        class="fa-solid fa-italic"></i></button>
+                <button onclick="document.execCommand('underline')"
+                    class="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded" title="Underline"><i
+                        class="fa-solid fa-underline"></i></button>
+                <div class="w-px h-6 bg-slate-300 mx-1"></div>
+                <button onclick="document.execCommand('insertUnorderedList')"
+                    class="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded" title="Bullet List"><i
+                        class="fa-solid fa-list-ul"></i></button>
+                <button onclick="document.execCommand('insertOrderedList')"
+                    class="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded" title="Numbered List"><i
+                        class="fa-solid fa-list-ol"></i></button>
+                <div class="w-px h-6 bg-slate-300 mx-1"></div>
+                <!-- Image Upload Trigger (Hidden Input) -->
+                <label class="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded cursor-pointer"
+                    title="Insert Image">
+                    <i class="fa-regular fa-image"></i>
+                    <input type="file" class="hidden" accept="image/*" onchange="
+                        if(this.files && this.files[0]) {
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                                const img = `<br><img src='${e.target.result}' class='max-w-full rounded-lg shadow-sm my-2'><br>`;
+                                document.execCommand('insertHTML', false, img);
+                            };
+                            reader.readAsDataURL(this.files[0]);
+                        }
+                    ">
+                </label>
+            </div>
+
+            <!-- Content Area -->
+            <div class="flex-1 overflow-y-auto p-6 bg-white cursor-text" id="note-content-editor" contenteditable="true"
+                onpaste="handleNoteImagePaste(event)"
+                class="prose prose-sm max-w-none focus:outline-none min-h-[300px]">
+            </div>
+
+            <!-- Footer -->
+            <div
+                class="px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex justify-between items-center">
+                <button id="btn-delete-note" onclick="deleteCurrentNote()"
+                    class="text-red-500 hover:text-red-700 text-sm font-bold flex items-center gap-2 hidden">
+                    <i class="fa-solid fa-trash"></i> Delete Note
+                </button>
+                <div class="flex gap-3 ml-auto">
+                    <button onclick="closeNoteEditor()"
+                        class="px-4 py-2 text-slate-500 hover:bg-slate-200 rounded-lg font-medium transition-colors">Cancel</button>
+                    <button onclick="saveNote()"
+                        class="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-bold rounded-lg shadow-sm transition-colors flex items-center gap-2">
+                        <i class="fa-solid fa-save"></i> Save Note
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/notes.js"></script>
 </body>
 
 </html>
