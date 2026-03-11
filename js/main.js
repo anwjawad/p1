@@ -8,6 +8,7 @@ var GAS_API_URL = "https://script.google.com/macros/s/AKfycbxJ0bG4MEptJCL_4057PM
 
 var appData = {
     patients: [],
+    pristinePatient: null, // Tracks original state for Delta Updates
     wards: {},
     sections: [], // Persistent Sections Metadata
     selectionMode: false,
@@ -667,6 +668,8 @@ function checkLabStatus(name, value) {
 
 function openModal(patient) {
     appData.currentPatient = patient;
+    // Store deep copy of untouched patient state for concurrency Delta Updates
+    appData.pristinePatient = JSON.parse(JSON.stringify(patient));
 
     // Clear old history cache & Trigger Check
     currentPatientHistory = [];
@@ -1563,15 +1566,39 @@ async function saveToBackend() {
         return;
     }
 
-    if (!appData.currentPatient) return;
+    if (!appData.currentPatient || !appData.pristinePatient) return;
 
     try {
+        // Delta Update Logic - Fixes Concurrency
+        const payload = { id: appData.currentPatient.id };
+        let hasChanges = false;
+
+        for (const key in appData.currentPatient) {
+            // Compare stringified versions to handle deep objects (symptoms, labs, objects) cleanly
+            const currentVal = JSON.stringify(appData.currentPatient[key]);
+            const pristineVal = JSON.stringify(appData.pristinePatient[key]);
+
+            if (currentVal !== pristineVal) {
+                payload[key] = appData.currentPatient[key];
+                hasChanges = true;
+            }
+        }
+
+        if (!hasChanges) {
+            const status = document.getElementById('save-status');
+            status.innerHTML = '<i class="fa-solid fa-check text-green-500 mr-1"></i> Saved (No changes)';
+            return;
+        }
+
         const res = await fetch(GAS_API_URL, {
             method: 'POST',
             mode: 'no-cors',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(appData.currentPatient)
+            body: JSON.stringify(payload) // Send ONLY payload delta
         });
+
+        // Update pristine state after successful save
+        appData.pristinePatient = JSON.parse(JSON.stringify(appData.currentPatient));
 
         const status = document.getElementById('save-status');
         status.innerHTML = '<i class="fa-solid fa-check text-green-500 mr-1"></i> Saved';
