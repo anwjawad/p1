@@ -1,4 +1,4 @@
-﻿
+
 // --------------------------------------------------------
 // CONFIGURATION
 // --------------------------------------------------------
@@ -5107,11 +5107,88 @@ function openHVCModal() {
     if (!appData.currentPatient) return;
     const p = appData.currentPatient;
 
-    // Pre-fill
-    document.getElementById('hvc-name').value = p.name || '';
-    document.getElementById('hvc-id').value = p.code || ''; // File Num
-    document.getElementById('hvc-age').value = p.age || '';
-    document.getElementById('hvc-diagnosis-detail').value = p.diagnosis || '';
+    // Robust Extraction helpers
+    const extractStr = (...keys) => {
+        for (let k of keys) {
+            if (p[k] !== undefined && p[k] !== null) return String(p[k]).trim();
+        }
+        return '';
+    };
+
+    const rawGender = extractStr('gender', 'Gender', 'Sex', 'sex');
+    let mappedGender = '';
+    if (rawGender.toLowerCase().startsWith('m')) mappedGender = 'Male';
+    else if (rawGender.toLowerCase().startsWith('f')) mappedGender = 'Female';
+
+    const rawAge = extractStr('age', 'Age');
+
+    // Pre-fill Demographics
+    document.getElementById('hvc-name').value = extractStr('name', 'Name');
+    document.getElementById('hvc-id').value = extractStr('code', 'File Num.', 'id');
+    document.getElementById('hvc-age').value = rawAge ? parseInt(rawAge) : '';
+    document.getElementById('hvc-gender').value = mappedGender;
+    document.getElementById('hvc-phone').value = extractStr('phone', 'Phone', 'Mobile', 'mobile', 'Phone No.');
+    document.getElementById('hvc-social').value = extractStr('social', 'Social status', 'Social Status');
+    document.getElementById('hvc-city').value = extractStr('city', 'City', 'Adress', 'address', 'residence', 'Residence');
+    document.getElementById('hvc-address').value = extractStr('specific_address', 'Home Address', 'address');
+    
+    // Fuzzy match for Doctor (Handles 4-word provider mapping to 2-word option)
+    const rawDoctor = extractStr('provider', 'doctor', 'consultant', 'Physician', 'Primary Physicien');
+    const docSelect = document.getElementById('hvc-doctor');
+    let matchedDoc = '';
+    
+    if (rawDoctor) {
+        const rawLower = rawDoctor.toLowerCase();
+        // 1. Try exact match
+        for (let opt of docSelect.options) {
+            if (opt.value && opt.value.toLowerCase() === rawLower) {
+                matchedDoc = opt.value;
+                break;
+            }
+        }
+        // 2. Try substring match (e.g. "Amer Zughaier" in "Amer Muhammad Ali Zughaier")
+        if (!matchedDoc) {
+            for (let opt of docSelect.options) {
+                if (!opt.value) continue;
+                const optLower = opt.value.toLowerCase();
+                if (rawLower.includes(optLower) || optLower.includes(rawLower)) {
+                    matchedDoc = opt.value;
+                    break;
+                }
+            }
+        }
+        // 3. Try First + Last name match
+        if (!matchedDoc) {
+            const rawParts = rawLower.split(/\s+/).filter(p => p.length > 2);
+            for (let opt of docSelect.options) {
+                if (!opt.value) continue;
+                const optParts = opt.value.toLowerCase().split(/\s+/);
+                if (rawParts.length >= 2 && optParts.length >= 2) {
+                    if (rawParts.includes(optParts[0]) && rawParts.includes(optParts[optParts.length - 1])) {
+                        matchedDoc = opt.value;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    docSelect.value = matchedDoc;
+    
+    // Pre-fill Clinical
+    document.getElementById('hvc-hospital').value = extractStr('hospital', 'Hospital');
+    document.getElementById('hvc-diagnosis-cat').value = extractStr('diagnosis_cat', 'Diagnosis');
+    document.getElementById('hvc-diagnosis-detail').value = extractStr('diagnosis', 'Specific Diagnosis');
+    document.getElementById('hvc-stage').value = extractStr('stage', 'Stage of Disease');
+    document.getElementById('hvc-intent').value = extractStr('intent', 'Intent of care');
+    document.getElementById('hvc-referral').value = extractStr('referral', 'Site of Referral');
+    
+    // Pre-fill Status
+    document.getElementById('hvc-priority').value = p.priority || p.Priority || '';
+    document.getElementById('hvc-ecog').value = p.ecog || p.ECOG || '';
+    document.getElementById('hvc-ppi').value = p.ppi || p.PPI || '';
+    document.getElementById('hvc-pps').value = p.pps || p.PPS || '';
+    
+    // Dates
     document.getElementById('hvc-date-reg').valueAsDate = new Date();
 
     // Show
@@ -5137,24 +5214,29 @@ async function submitHVCForm() {
         action: 'register',
         data: {
             'Pt Name': document.getElementById('hvc-name').value,
-            'Pt file Num.': document.getElementById('hvc-id').value,
             'Gender': document.getElementById('hvc-gender').value,
             'Age': document.getElementById('hvc-age').value,
-            'phone No.': document.getElementById('hvc-phone').value,
-            'Social Status': document.getElementById('hvc-social').value,
-            'City/Area (Adress)': document.getElementById('hvc-city').value,
-            'Specific Home Address': document.getElementById('hvc-address').value,
+            'Pt file Num.': document.getElementById('hvc-id').value,
+            'Adress': document.getElementById('hvc-city').value,
             'Hospital': document.getElementById('hvc-hospital').value,
-            'Primary Physician': document.getElementById('hvc-doctor').value,
+            'Intent of care': document.getElementById('hvc-intent').value,
+            'priority': document.getElementById('hvc-priority').value,
+            'Social status': document.getElementById('hvc-social').value,
             'Diagnosis': document.getElementById('hvc-diagnosis-cat').value,
             'Specific Diagnosis': document.getElementById('hvc-diagnosis-detail').value,
-            'Opioid?': document.getElementById('hvc-opioid').value,
-            'Priority': document.getElementById('hvc-priority').value,
-            'ECGO': document.getElementById('hvc-ecog').value,
+            'Primary Physicien': document.getElementById('hvc-doctor').value,
+            'date': document.getElementById('hvc-date-reg').value,
+            'phone No.': document.getElementById('hvc-phone').value,
+            'Home Address': document.getElementById('hvc-address').value,
+            'Servival Status': document.getElementById('hvc-survival').value,
+            'Date of death': document.getElementById('hvc-date-death').value,
+            'Stage of Disease': document.getElementById('hvc-stage').value,
+            'Site of Referral': document.getElementById('hvc-referral').value,
+            'ECOG': document.getElementById('hvc-ecog').value,
             'PPI': document.getElementById('hvc-ppi').value,
             'PPS': document.getElementById('hvc-pps').value,
-            'Registration Date': document.getElementById('hvc-date-reg').value,
-            'Servival Status': 'Alive'
+            'number of visits': document.getElementById('hvc-visits').value,
+            'Place of death': document.getElementById('hvc-place-death').value
         }
     };
 
@@ -5181,15 +5263,23 @@ async function submitHVCForm() {
         }
 
         closeHVCModal();
-        alert("Patient registered in Home Visit system successfully!");
+        
+        // Use timeout so the UI paints the modal closing before the alert blocks it
+        setTimeout(() => {
+            alert("Patient registered in Home Visit system successfully!");
+            btn.disabled = false;
+            btn.classList.remove('opacity-50');
+            statusDiv.classList.add('hidden');
+        }, 50);
 
     } catch (e) {
         console.error("HVC Submit Error", e);
-        alert("Failed to submit to Home Visit App. Check console.");
-    } finally {
-        btn.disabled = false;
-        btn.classList.remove('opacity-50');
-        statusDiv.classList.add('hidden');
+        setTimeout(() => {
+            alert("Failed to submit to Home Visit App. Check console.");
+            btn.disabled = false;
+            btn.classList.remove('opacity-50');
+            statusDiv.classList.add('hidden');
+        }, 50);
     }
 }
 
