@@ -189,13 +189,8 @@ function renderPatientsGrid(patients) {
 
             // --- Labs Badges ---
             let labBadges = '';
-            let parsedLabs = p.labs;
-            if (typeof parsedLabs === 'string') {
-                try { parsedLabs = JSON.parse(parsedLabs); } catch(e) { parsedLabs = {}; }
-            }
-
-            if (parsedLabs && typeof parsedLabs === 'object') {
-                Object.entries(parsedLabs).forEach(([k, v]) => {
+            if (p.labs) {
+                Object.entries(p.labs).forEach(([k, v]) => {
                     const isStandard = appData.ranges && appData.ranges[k];
                     // Use global checkLabStatus if available
                     const status = (isStandard && typeof checkLabStatus === 'function') ? checkLabStatus(k, v.value) : 'custom';
@@ -225,27 +220,10 @@ function renderPatientsGrid(patients) {
 
             // --- Symptoms (Active + Notes) ---
             let symptomText = '';
-            let ecogBadge = ''; // Initialize ECOG Badge
-
-            // Parse symptoms object if it's stored as a string
-            let parsedSymptoms = p.symptoms;
-            if (typeof parsedSymptoms === 'string') {
-                try { parsedSymptoms = JSON.parse(parsedSymptoms); } catch(e) { parsedSymptoms = {}; }
-            }
-
-            if (parsedSymptoms) {
-                // Extract ECOG
-                if (parsedSymptoms['ECOG'] && parsedSymptoms['ECOG'].active && parsedSymptoms['ECOG'].value !== null && parsedSymptoms['ECOG'].value !== undefined) {
-                    const ecogValue = parsedSymptoms['ECOG'].value;
-                    let ecogColor = 'bg-violet-100 text-violet-700 border-violet-200';
-                    if (ecogValue >= 3) ecogColor = 'bg-orange-100 text-orange-700 border-orange-200';
-                    
-                    ecogBadge = `<div class="px-2 py-0.5 rounded-md border text-[10px] font-bold ${ecogColor} whitespace-nowrap shadow-sm ml-2 flex items-center" title="ECOG Performance Status">ECOG ${ecogValue}</div>`;
-                }
-
-                // Filter where value.active is true and ignore ECOG
-                const activeSymptoms = Object.entries(parsedSymptoms)
-                    .filter(([k, v]) => v && v.active === true && k !== 'ECOG');
+            if (p.symptoms) {
+                // Filter where value.active is true
+                const activeSymptoms = Object.entries(p.symptoms)
+                    .filter(([k, v]) => v && v.active === true);
 
                 if (activeSymptoms.length > 0) {
                     const chips = activeSymptoms.map(([k, v]) => {
@@ -314,10 +292,7 @@ function renderPatientsGrid(patients) {
                      </h3>
                      <div class="text-xs text-slate-400 font-mono mt-0.5">${p.code}</div>
                 </div>
-                <div class="flex items-center">
-                    <div class="bg-slate-100 text-slate-500 text-xs font-bold px-2 py-1 rounded-lg whitespace-nowrap">RM ${p.room}</div>
-                    ${ecogBadge}
-                </div>
+                <div class="bg-slate-100 text-slate-500 text-xs font-bold px-2 py-1 rounded-lg whitespace-nowrap">RM ${p.room}</div>
             </div>
             
             ${labBadges ? `<div class="flex flex-wrap gap-1 mb-3">${labBadges}</div>` : ''}
@@ -450,7 +425,6 @@ function renderPatientsGrid(patients) {
                         if (typeof openHVCModal === 'function') {
                             // Ensure context is set
                             appData.currentPatient = p;
-                            appData.pristinePatient = JSON.parse(JSON.stringify(p));
                             openHVCModal();
                         }
                     };

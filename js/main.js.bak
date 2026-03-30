@@ -175,9 +175,7 @@ function loadMockData() {
 async function fetchData() {
     try {
         document.getElementById('patient-count').innerText = "...";
-        // Cache-busting to ensure latest DB changes are always fetched on refresh
-        const fetchUrl = GAS_API_URL + (GAS_API_URL.includes('?') ? '&' : '?') + 'nocache=' + new Date().getTime();
-        const res = await fetch(fetchUrl, { cache: 'no-store' });
+        const res = await fetch(GAS_API_URL);
         const json = await res.json();
 
         let patients = [];
@@ -3148,7 +3146,7 @@ function quickAddStandardSections() {
 // --- Plan System Logic ---
 
 function openPlanModal(patient) {
-    appData.currentPatient = patient; appData.pristinePatient = JSON.parse(JSON.stringify(patient)); // Ensure context
+    appData.currentPatient = patient; // Ensure context
     const modal = document.getElementById('plan-modal');
     modal.classList.remove('hidden');
     resetPlanView();
@@ -4632,18 +4630,14 @@ async function uploadFileToBackend(file) {
 // --------------------------------------------------------
 let tempSymptoms = {}; // Local state for the modal
 const COMMON_SYMPTOMS = [
-    'Pain', 'Nausea', 'Vomiting', 'Dyspnea', 'Shortness of Breath', 'Constipation', 'Diarrhea',
-    'Delirium', 'Confusion', 'Disoriented', 'Agitation', 'Fatigue', 'Drowsiness', 'Somnolence', 'Altered level of consciousness',
-    'Anorexia', 'Lack of Appetite', 'Anxiety', 'Depression', 'Insomnia', 
-    'Cough', 'Dry Mouth', 'Pruritus', 'Dizziness', 'Dysarthria',
-    'Bloated', 'Abdominal Distension', 'Odynophagia', 'Dysphagia',
-    'DVT', 'Edema', 'Blurred vision', 'Skin discoloration', 'Mucositis',
-    'Neuropathy', 'Dysuria', 'Anemia', 'Well-being'
+    'Pain', 'Nausea', 'Vomiting', 'Dyspnea', 'Constipation',
+    'Delirium', 'Agitation', 'Fatigue', 'Anorexia', 'Anxiety',
+    'Depression', 'Insomnia', 'Cough', 'Dry Mouth', 'Pruritus'
 ];
 
 function openSymptomsModal(patient) {
     if (!patient) return;
-    appData.currentPatient = patient; appData.pristinePatient = JSON.parse(JSON.stringify(patient)); // Ensure context
+    appData.currentPatient = patient; // Ensure context
 
     // Parse Existing
     tempSymptoms = {};
@@ -4674,7 +4668,7 @@ function renderSymptomsUI() {
 
     // 1. Render Active List
     activeList.innerHTML = '';
-    const activeKeys = Object.keys(tempSymptoms).filter(k => tempSymptoms[k] && tempSymptoms[k].active && k !== 'ECOG');
+    const activeKeys = Object.keys(tempSymptoms).filter(k => tempSymptoms[k] && tempSymptoms[k].active);
 
     if (activeKeys.length === 0) {
         activeList.innerHTML = '<div class="text-center text-slate-400 text-sm py-4 italic">No active symptoms reported.</div>';
@@ -4716,36 +4710,6 @@ function renderSymptomsUI() {
         btn.onclick = () => addSymptom(s);
         quickGrid.appendChild(btn);
     });
-
-    // Render ECOG UI updates
-    const ecogLabels = {
-        0: '0 - Fully active, able to carry on all pre-disease performance',
-        1: '1 - Restricted in physically strenuous activity but ambulatory',
-        2: '2 - Ambulatory and capable of all selfcare but unable to carry out any work activities',
-        3: '3 - Capable of only limited selfcare; confined to bed or chair > 50% of waking hours',
-        4: '4 - Completely disabled; cannot carry on any selfcare; totally confined to bed or chair'
-    };
-    const currentEcog = (tempSymptoms['ECOG'] && tempSymptoms['ECOG'].active && tempSymptoms['ECOG'].value !== undefined) ? tempSymptoms['ECOG'].value : null;
-
-    [0, 1, 2, 3, 4].forEach(val => {
-        const btn = document.getElementById(`ecog-btn-${val}`);
-        if (!btn) return;
-        if (currentEcog === val) {
-            btn.className = "flex-1 py-1.5 rounded-lg border-2 border-violet-500 bg-violet-50 text-sm font-bold text-violet-700 shadow-sm transition-all transform scale-105";
-        } else {
-            btn.className = "flex-1 py-1.5 rounded-lg border border-slate-200 text-sm font-bold text-slate-600 hover:bg-violet-50 hover:text-violet-600 hover:border-violet-200 transition-all";
-        }
-    });
-
-    const statusText = document.getElementById('ecog-status-text');
-    if (statusText) {
-        statusText.innerText = currentEcog !== null ? ecogLabels[currentEcog] : 'Select ECOG Performance Status';
-    }
-}
-
-function setECOG(val) {
-    tempSymptoms['ECOG'] = { active: true, value: val };
-    renderSymptomsUI();
 }
 
 function addSymptom(name) {
@@ -4784,9 +4748,13 @@ function updateSymptomNote(name, note) {
 function saveSymptomsData() {
     if (!appData.currentPatient) return;
 
-    // Convert tempSymptoms to a JSON string for the backend to save into a single cell properly.
-    // If sent as an object, GAS will forcefully convert it to the string "[object Object]".
-    appData.currentPatient.symptoms = JSON.stringify(tempSymptoms);
+    // Direct Object Update (No Stringify needed for appData, but maybe for GAS?)
+    // Our sync mechanism usually saves valid JSON objects as Strings if the backend requires it, 
+    // OR if we are using the simple CSV mapping, it might need to check triggerSave logic.
+    // Assuming TriggerSave serializes efficiently or backend handles it.
+    // Based on `renderModalLabs`, logic seems to support JSON stored in column.
+
+    appData.currentPatient.symptoms = tempSymptoms;
 
     // Update UI immediately
     renderPatientsGrid(appData.wards[appData.currentWard]);
@@ -4804,7 +4772,7 @@ let currentLabView = 'image'; // 'image' or 'manual'
 
 function openLabsModal(patient) {
     if (!patient) return;
-    appData.currentPatient = patient; appData.pristinePatient = JSON.parse(JSON.stringify(patient));
+    appData.currentPatient = patient;
     document.getElementById('lab-patient-name').textContent = patient.name;
 
     // Default View
@@ -4934,28 +4902,6 @@ function renderNewLabsGrid(labs) {
             "<span class='text-[9px] text-slate-300 font-mono'>" + min + "-" + max + "</span>";
         container.appendChild(div);
     });
-
-    // Render custom keys
-    const customContainer = document.getElementById('labs-custom-grid');
-    if (customContainer) {
-        customContainer.innerHTML = '';
-        Object.keys(labs).forEach(key => {
-            if (!standardKeys.includes(key)) {
-                // If it's a legacy plain string key, convert to standard {value: string} logic, but usually it's an object via updateLabValue.
-                const valObj = typeof labs[key] === 'object' ? labs[key] : { value: String(labs[key] || '') };
-                const val = valObj.value !== undefined ? valObj.value : '';
-                
-                const div = document.createElement('div');
-                div.className = "p-3 rounded-xl border border-slate-200 bg-white flex flex-col items-center justify-between h-24 relative hover:shadow-sm transition-all group animate-entry";
-                div.innerHTML = `
-                    <button onclick="removeCustomLab('${key}')" class="absolute -top-2 -right-2 bg-red-100 text-red-600 rounded-full w-5 h-5 flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-red-500 hover:text-white" title="Remove Lab test"><i class="fa-solid fa-times"></i></button>
-                    <input type="text" value="${key}" class="w-full text-center text-[10px] font-bold text-slate-400 uppercase bg-transparent outline-none border-b border-dashed border-slate-200 mb-1 focus:text-slate-800 focus:border-slate-400" placeholder="TEST NAME" onchange="renameCustomLab('${key}', this.value)">
-                    <input type="text" value="${val}" class="w-full text-center bg-transparent text-lg font-bold text-slate-800 outline-none border-b border-transparent focus:border-blue-400" placeholder="VALUE" onchange="updateLabValue('${key}', this.value)">
-                `;
-                customContainer.appendChild(div);
-            }
-        });
-    }
 }
 
 function updateLabValue(key, value) {
@@ -4971,42 +4917,10 @@ function updateLabValue(key, value) {
     appData.currentPatient.labs[key].value = value;
 }
 
-function addCustomLabRow() {
-    if (!appData.currentPatient.labs) appData.currentPatient.labs = {};
-    if (typeof appData.currentPatient.labs === 'string') {
-        try { appData.currentPatient.labs = JSON.parse(appData.currentPatient.labs); } catch (e) { appData.currentPatient.labs = {}; }
-    }
-    const newKey = "TEST_" + Math.floor(Math.random() * 1000);
-    appData.currentPatient.labs[newKey] = { value: '' };
-    renderNewLabsGrid(appData.currentPatient.labs);
-}
-
-function renameCustomLab(oldKey, newKeyInput) {
-    if (!newKeyInput || !newKeyInput.trim()) return;
-    const newKey = newKeyInput.trim().toUpperCase();
-    if (oldKey === newKey) return;
-    
-    appData.currentPatient.labs[newKey] = appData.currentPatient.labs[oldKey];
-    delete appData.currentPatient.labs[oldKey];
-    renderNewLabsGrid(appData.currentPatient.labs);
-}
-
-function removeCustomLab(key) {
-    if (appData.currentPatient.labs && appData.currentPatient.labs[key]) {
-        delete appData.currentPatient.labs[key];
-        renderNewLabsGrid(appData.currentPatient.labs);
-    }
-}
-
 function saveLabsData() {
-    if (appData.currentPatient && typeof appData.currentPatient.labs === 'object') {
-        appData.currentPatient.labs = JSON.stringify(appData.currentPatient.labs);
-    }
-    // Update UI immediately for real-time responsiveness
-    renderPatientsGrid(appData.wards[appData.currentWard] || appData.patients);
-    
     triggerSave();
     closeLabsModal();
+    renderPatientsGrid(appData.wards[appData.currentWard]);
 }
 
 function toggleCalc() {
