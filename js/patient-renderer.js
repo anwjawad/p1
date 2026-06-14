@@ -28,7 +28,7 @@ function renderPatientsGrid(patients) {
         // Check if Pharmacy Mode is Active
         if (appData.pharmacyMode) {
             // --- PHARMACY CARD LAYOUT ---
-            let classes = "bg-white rounded-2xl p-4 shadow-sm border-2 border-slate-100 hover:border-indigo-300 transition-all flex flex-col h-[500px] relative animate-entry"; // Fixed height for consistency
+            let classes = "patient-card bg-white rounded-2xl p-4 shadow-sm border-2 border-slate-100 hover:border-indigo-300 transition-all flex flex-col h-[500px] relative animate-entry";
             card.className = classes;
             card.style.animationDelay = `${index * 50}ms`;
 
@@ -145,7 +145,7 @@ function renderPatientsGrid(patients) {
 
         } else {
             // --- STANDARD CARD LAYOUT ---
-            let classes = "bg-white rounded-2xl p-4 md:p-5 shadow-sm transition-all duration-300 border border-slate-100 relative overflow-hidden animate-entry opacity-0";
+            let classes = "patient-card bg-white rounded-2xl p-4 md:p-5 shadow-sm transition-all duration-300 border border-slate-100 relative overflow-hidden animate-entry opacity-0";
 
             // Interactive classes
             if (!appData.selectionMode) {

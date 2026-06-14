@@ -290,10 +290,12 @@ function saveMetadata() {
         };
         fetch(GAS_API_URL, {
             method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // Avoid Options
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify(payload)
-        }).catch(e => console.error("Metadata save failed", e));
+        })
+        .then(r => r.json())
+        .then(json => { if (json.error) console.warn("Metadata save error:", json.error); })
+        .catch(e => console.error("Metadata save failed", e));
     }
 }
 
@@ -388,7 +390,8 @@ function deleteWard(wardName) {
 async function syncBatchUpdate(updates) {
     if (Object.keys(updates).length === 0) return;
 
-    document.getElementById('save-status').innerText = "Processing batch update...";
+    const statusEl = document.getElementById('save-status');
+    if (statusEl) statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Saving…';
 
     try {
         const payload = {
@@ -396,18 +399,25 @@ async function syncBatchUpdate(updates) {
             updates: updates
         };
 
-        await fetch(GAS_API_URL, {
+        // Use cors mode (not no-cors) so we can actually read the response and detect errors.
+        // GAS must be deployed as "Anyone" access for this to work without credentials.
+        const res = await fetch(GAS_API_URL, {
             method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify(payload)
         });
 
-        document.getElementById('save-status').innerHTML = '<i class="fa-solid fa-check text-green-500 mr-1"></i> Changes saved';
+        const json = await res.json().catch(() => ({}));
+
+        if (json.error) {
+            throw new Error(json.error);
+        }
+
+        if (statusEl) statusEl.innerHTML = '<i class="fa-solid fa-check text-green-500 mr-1"></i> All changes saved';
 
     } catch (e) {
         console.error("Batch update failed", e);
-        document.getElementById('save-status').innerText = "Update Failed!";
+        if (statusEl) statusEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-red-500 mr-1"></i> Save failed — retry';
     }
 }
 
@@ -1594,12 +1604,14 @@ async function saveToBackend() {
 
         const res = await fetch(GAS_API_URL, {
             method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload) // Send ONLY payload delta
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(payload)
         });
 
-        // Update pristine state after successful save
+        const json = await res.json().catch(() => ({}));
+        if (json.error) throw new Error(json.error);
+
+        // Update pristine state only after confirmed save
         appData.pristinePatient = JSON.parse(JSON.stringify(appData.currentPatient));
 
         const status = document.getElementById('save-status');
@@ -2081,20 +2093,21 @@ async function startImport() {
         // DEBUG: Check payload
         console.log("Payload:", payload);
 
+        document.getElementById('import-status-text').innerText = "Sending to server...";
+
         const res = await fetch(GAS_API_URL, {
             method: 'POST',
-            mode: 'no-cors', // <--- This often hides errors. 
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify(payload)
         });
 
-        // Since mode is no-cors, we can't read the response text.
-        // We rely on the request passing through.
+        const json = await res.json().catch(() => ({}));
+        if (json.error) throw new Error(json.error);
 
-        document.getElementById('import-status-text').innerText = "Processing on server...";
-        await new Promise(r => setTimeout(r, 2000));
+        document.getElementById('import-status-text').innerText = `Imported ${json.count || allPatients.length} patients successfully.`;
+        await new Promise(r => setTimeout(r, 800));
 
-        alert("Import sent to server! Refresh the page in a few seconds to see changes.\n(If empty, check headers in Sheet)");
+        alert(`Import complete! ${json.count || allPatients.length} patients added.`);
         closeImportModal();
         fetchData();
 
