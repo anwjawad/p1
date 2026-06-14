@@ -27,7 +27,10 @@ function doGet(e) {
 function doPost(e) {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("HCV");
     const lock = LockService.getScriptLock();
-    lock.tryLock(10000);
+    if (!lock.tryLock(10000)) {
+        return ContentService.createTextOutput(JSON.stringify({ error: "Server busy, please try again." }))
+            .setMimeType(ContentService.MimeType.JSON);
+    }
 
     try {
         const payload = JSON.parse(e.postData.contents);
@@ -99,13 +102,13 @@ function doPost(e) {
                     colIndex = headers.findIndex(h => String(h).trim().toLowerCase() === String(key).trim().toLowerCase());
                 }
 
-                // Handle Dynamic Column Creation (Now allows ANY column like 'Place of death')
+                // Handle Dynamic Column Creation — capped at 60 columns to prevent schema drift
                 if (colIndex === -1) {
-                    if (key && key.length > 0) {
+                    if (key && key.length > 0 && sheet.getLastColumn() < 60) {
                         sheet.insertColumnAfter(sheet.getLastColumn());
                         const newColIndex = sheet.getLastColumn();
-                        sheet.getRange(1, newColIndex).setValue(key); // Set Header
-                        headers.push(key); // Update local headers array
+                        sheet.getRange(1, newColIndex).setValue(key);
+                        headers.push(key);
                         colIndex = newColIndex - 1;
                     }
                 }

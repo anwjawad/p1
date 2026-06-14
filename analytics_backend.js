@@ -11,8 +11,9 @@ function handleGetAnalyticsData() {
 
     var headers = data[0];
     var dateIdx = 0; // 'Date' is usually first
-    var symptomsIdx = headers.indexOf('Symptoms'); // Case sensitive? Based on handleDailyReset it is 'Symptoms' or 'symptoms'
+    var symptomsIdx = headers.indexOf('Symptoms');
     if (symptomsIdx === -1) symptomsIdx = headers.indexOf('symptoms');
+    if (symptomsIdx === -1) return { status: 'success', dates: [], census: [], symptoms: {} };
 
     // Aggregation Map: DateString -> { count: 0, symptoms: { Pain: 0, ... } }
     var dailyStats = {};

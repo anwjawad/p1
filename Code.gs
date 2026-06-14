@@ -5,18 +5,8 @@
 var SHEET_NAME = 'Patients';
 var METADATA_SHEET_NAME = 'Metadata'; // New Sheet for Settings/Sections
 var LOCK_WAIT_MS = 10000;
-var GEMINI_API_KEY = 'AIzaSyCgEFZD3ulhQYflQokknERqcHrTAerS-XA'; 
+var GEMINI_API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
 var IMAGE_FOLDER_NAME = 'Palliative_Images'; // Folder for uploaded images
-
-// --- CORS Config ---
-function doOptions(e) {
-  var headers = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type"
-  };
-  return ContentService.createTextOutput("").setMimeType(ContentService.MimeType.TEXT);
-}
 
 // --- Auth Helper ---
 function forceAuth() {
@@ -447,7 +437,9 @@ function handleDailyReset() {
   
   // 4. WIPE DASHBOARD (User Requirement)
   // Clear everything from Row 2 downwards on the Patients sheet
-  sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();
+  if (sheet.getLastRow() > 1) {
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();
+  }
   
   return { status: 'success', archived_count: archiveRows.length, message: 'New Day Started. perfectly archived and cleared.' };
 }
@@ -465,7 +457,7 @@ function handleGetArchivedDates() {
   for (var i = 1; i < data.length; i++) {
     var d = new Date(data[i][0]);
     if (!isNaN(d.getTime())) {
-        var key = d.toLocaleDateString(); // Local format ok for display
+        var key = d.toLocaleDateString('en-CA'); // ISO YYYY-MM-DD — must match handleGetArchiveForDate
         dateSet[key] = true;
     }
   }
@@ -860,8 +852,8 @@ function handleSingleUpdate(p) {
     }
   }
   
-  var newRow = headers.map(function(h) {
-    var oldVal = (rowIndex > -1) ? values[rowIndex][headers.indexOf(h)] : '';
+  var newRow = headers.map(function(h, colIdx) {
+    var oldVal = (rowIndex > -1) ? values[rowIndex][colIdx] : '';
     var newVal = p[h];
     
     if (newVal === undefined) return oldVal; 

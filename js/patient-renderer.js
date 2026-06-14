@@ -3,11 +3,16 @@
 // Patient Card Renderer (Extracted for better maintainability)
 // -------------------------------------------------------------------------
 
-/**
- * Renders the grid of patient cards
- * Overrides the function in main.js
- * @param {Array} patients 
- */
+function escHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function renderPatientsGrid(patients) {
     const grid = document.getElementById('patients-grid');
     grid.innerHTML = '';
@@ -45,15 +50,15 @@ function renderPatientsGrid(patients) {
                 <!-- Compact Header -->
                 <div class="flex justify-between items-center mb-3 pb-2 border-b border-slate-100">
                     <div>
-                        <h3 class="font-bold text-base text-slate-800 leading-tight">${p.name}</h3>
-                        <div class="text-[10px] text-slate-400 font-mono">${p.code} | Age: ${parseInt(p.age || 0)}</div>
+                        <h3 class="font-bold text-base text-slate-800 leading-tight">${escHtml(p.name)}</h3>
+                        <div class="text-[10px] text-slate-400 font-mono">${escHtml(p.code)} | Age: ${parseInt(p.age || 0)}</div>
                     </div>
-                    <div class="bg-indigo-50 text-indigo-600 text-[10px] font-bold px-2 py-1 rounded whitespace-nowrap">RM ${p.room}</div>
+                    <div class="bg-indigo-50 text-indigo-600 text-[10px] font-bold px-2 py-1 rounded whitespace-nowrap">RM ${escHtml(p.room)}</div>
                 </div>
 
                 <!-- Medication Editors -->
                 <div class="flex-1 flex flex-col gap-2 overflow-hidden">
-                    
+
                     <!-- Regular Meds -->
                     <div class="flex-1 flex flex-col min-h-0">
                         <label class="text-[10px] font-bold text-indigo-600 uppercase mb-1 flex justify-between">
@@ -61,7 +66,7 @@ function renderPatientsGrid(patients) {
                             <i class="fa-solid fa-pills opacity-50"></i>
                         </label>
                         <textarea class="w-full flex-1 resize-none bg-slate-50 border border-slate-200 rounded p-2 text-xs font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all placeholder-slate-300 med-editor-reg"
-                            placeholder="Paste Regular Meds..." spellcheck="false" data-id="${p.id}">${meds.regular || ''}</textarea>
+                            placeholder="Paste Regular Meds..." spellcheck="false" data-id="${p.id}">${escHtml(meds.regular || '')}</textarea>
                     </div>
 
                     <!-- PRN Meds -->
@@ -71,7 +76,7 @@ function renderPatientsGrid(patients) {
                             <i class="fa-solid fa-tablets opacity-50"></i>
                         </label>
                         <textarea class="w-full flex-1 resize-none bg-slate-50 border border-slate-200 rounded p-2 text-xs font-mono focus:ring-2 focus:ring-pink-500 outline-none transition-all placeholder-slate-300 med-editor-prn"
-                            placeholder="Paste PRN Meds..." spellcheck="false" data-id="${p.id}">${meds.prn || ''}</textarea>
+                            placeholder="Paste PRN Meds..." spellcheck="false" data-id="${p.id}">${escHtml(meds.prn || '')}</textarea>
                     </div>
                 </div>
                 
@@ -214,8 +219,8 @@ function renderPatientsGrid(patients) {
 
                         labBadges += `
                         <div class="px-1.5 py-0.5 rounded border text-[10px] font-bold ${colorClass} flex items-center gap-1">
-                            <span>${k}</span>
-                            <span>${v.value}</span>
+                            <span>${escHtml(k)}</span>
+                            <span>${escHtml(v.value)}</span>
                             <span>${icon}</span>
                         </div>
                     `;
@@ -251,11 +256,11 @@ function renderPatientsGrid(patients) {
                     const chips = activeSymptoms.map(([k, v]) => {
                         let noteHtml = '';
                         if (v.note && v.note.trim()) {
-                            noteHtml = `<span class="ml-1 pl-1 border-l border-rose-200 text-rose-800 italic font-normal max-w-[150px] truncate inline-block align-bottom">${v.note}</span>`;
+                            noteHtml = `<span class="ml-1 pl-1 border-l border-rose-200 text-rose-800 italic font-normal max-w-[150px] truncate inline-block align-bottom">${escHtml(v.note)}</span>`;
                         }
 
                         return `<span class="px-1.5 py-0.5 rounded border text-[10px] bg-rose-50 text-rose-700 border-rose-100 font-bold flex items-center mb-1 mr-1 w-max max-w-full">
-                        <span class="shrink-0">${k}</span>
+                        <span class="shrink-0">${escHtml(k)}</span>
                         ${noteHtml}
                     </span>`;
                     }).join('');
@@ -276,8 +281,8 @@ function renderPatientsGrid(patients) {
                     else if (item.type === 'consult') { colorClass = 'text-purple-600'; icon = 'user-doctor'; }
                     else if (item.type === 'note') { colorClass = 'text-amber-600'; icon = 'note-sticky'; }
 
-                    let displayText = item.details;
-                    if (item.type === 'medication' && item.action) displayText = `<strong>${item.action}:</strong> ${item.details}`;
+                    let displayText = escHtml(item.details || '');
+                    if (item.type === 'medication' && item.action) displayText = `<strong>${escHtml(item.action)}:</strong> ${escHtml(item.details || '')}`;
 
                     planPreviewHTML += `
                     <div class="group/plan flex gap-2 items-start text-xs ${colorClass} relative pr-4">
@@ -309,13 +314,13 @@ function renderPatientsGrid(patients) {
             <div class="flex justify-between items-start mb-3 pr-8">
                 <div>
                      <h3 class="font-bold text-lg text-slate-800 group-hover:text-medical-600 transition-colors leading-tight">
-                        ${p.name} 
+                        ${escHtml(p.name)}
                         <span class="inline-block bg-slate-100 text-slate-500 text-[10px] px-1.5 py-0.5 rounded ml-1 align-middle">${parseInt(p.age || 0)}</span>
                      </h3>
-                     <div class="text-xs text-slate-400 font-mono mt-0.5">${p.code}</div>
+                     <div class="text-xs text-slate-400 font-mono mt-0.5">${escHtml(p.code)}</div>
                 </div>
                 <div class="flex items-center">
-                    <div class="bg-slate-100 text-slate-500 text-xs font-bold px-2 py-1 rounded-lg whitespace-nowrap">RM ${p.room}</div>
+                    <div class="bg-slate-100 text-slate-500 text-xs font-bold px-2 py-1 rounded-lg whitespace-nowrap">RM ${escHtml(p.room)}</div>
                     ${ecogBadge}
                 </div>
             </div>
@@ -326,14 +331,14 @@ function renderPatientsGrid(patients) {
             <div class="space-y-2 mb-3">
                 ${p.diagnosis ? `
                 <div class="text-sm text-slate-700">
-                    <span class="font-bold text-blue-600 text-xs uppercase mr-1 bg-blue-50 px-1 rounded">Dx</span> 
-                    ${p.diagnosis}
+                    <span class="font-bold text-blue-600 text-xs uppercase mr-1 bg-blue-50 px-1 rounded">Dx</span>
+                    ${escHtml(p.diagnosis)}
                 </div>` : ''}
-                
+
                 ${p.treatment ? `
                 <div class="text-sm text-slate-600 whitespace-pre-wrap leading-snug">
-                    <span class="font-bold text-emerald-600 text-xs uppercase mr-1 bg-emerald-50 px-1 rounded">Rx</span> 
-                    ${p.treatment}
+                    <span class="font-bold text-emerald-600 text-xs uppercase mr-1 bg-emerald-50 px-1 rounded">Rx</span>
+                    ${escHtml(p.treatment)}
                 </div>` : ''}
             </div>
 
@@ -344,8 +349,8 @@ function renderPatientsGrid(patients) {
             <!-- Footer Buttons -->
             <div class="flex items-center gap-2 mt-3 pt-3 border-t border-slate-50 justify-between">
                 <div class="flex items-center gap-2">
-                    <span class="text-xs text-slate-500 font-medium" title="${p.provider || 'Unassigned'}">
-                        <i class="fa-solid fa-user-doctor mr-1"></i> ${p.provider || 'Unassigned'}
+                    <span class="text-xs text-slate-500 font-medium" title="${escHtml(p.provider || 'Unassigned')}">
+                        <i class="fa-solid fa-user-doctor mr-1"></i> ${escHtml(p.provider || 'Unassigned')}
                     </span>
                     
                     <!-- HVC Status Indicator (Left Side) -->
