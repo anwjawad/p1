@@ -5569,6 +5569,13 @@ function openCathStudioView() {
     if (typeof renderPortCathStudio === 'function') {
         renderPortCathStudio();
     }
+
+    // Re-fetch on every open so a user who navigates here before the boot-time
+    // fetch resolves still gets fresh data — fetchPortCathList()'s own .then()
+    // re-renders the Studio once the response lands (see its guard above).
+    if (typeof fetchPortCathList === 'function') {
+        fetchPortCathList();
+    }
 }
 
 function closeCathStudioView() {
