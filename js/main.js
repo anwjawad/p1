@@ -43,7 +43,6 @@ var appData = {
     currentPatient: null,
     historyIndex: { ids: new Set(), codes: new Set() },
     hvcList: [],
-    portCathList: [],
     pharmacyMode: false // New Mode
 };
 
@@ -5155,6 +5154,10 @@ const PE_API_URL = "https://script.google.com/macros/s/AKfycbwjwZcOtRy0SmgBZABxP
 const PORTCATH_API_URL = "https://script.google.com/macros/s/AKfycbyxuzwed0kHqZ3jPJKWKemX0huzKOFvm-1nooaTlo3NwEePG-ElI_9xkADLjTk-R6bK/exec";
 const PORTCATH_API_KEY = "medsched-2026-key-abc123";
 
+// Bare global (not on appData) because js/cath-studio.js (ported verbatim from jk)
+// expects this exact global variable name, matching jk's own convention.
+let portCathList = [];
+
 function fetchHVCPatients() {
     console.log("Fetching HVC Patient List...");
     const url = HVC_API_URL + "?action=get_patient_list";
@@ -5481,13 +5484,22 @@ function fetchPortCathList() {
         .then(res => res.json())
         .then(data => {
             if (data && data.status === 'ok' && Array.isArray(data.portcath)) {
-                appData.portCathList = data.portcath;
-                console.log("Port Cath List Loaded:", appData.portCathList.length);
+                portCathList = data.portcath;
+                if (Array.isArray(data.portcathSessionConfig)) {
+                    portCathSessionConfig = data.portcathSessionConfig;
+                }
+                if (Array.isArray(data.portcathHistory)) {
+                    portCathActionHistory = data.portcathHistory;
+                }
+                console.log("Port Cath List Loaded:", portCathList.length);
 
                 if (appData.currentWard && appData.wards[appData.currentWard]) {
                     if (typeof renderPatientsGrid === 'function') {
                         renderPatientsGrid(appData.wards[appData.currentWard]);
                     }
+                }
+                if (typeof renderPortCathStudio === 'function' && document.getElementById('cath-studio-view') && !document.getElementById('cath-studio-view').classList.contains('hidden')) {
+                    renderPortCathStudio();
                 }
             } else {
                 console.warn("Port Cath List Fetch Failed or Empty", data);
@@ -5497,10 +5509,10 @@ function fetchPortCathList() {
 }
 
 function getPortCathRecord(patient) {
-    if (!appData.portCathList || !patient) return null;
+    if (!portCathList || !patient) return null;
     const code = String(patient.code || patient.id || '').trim();
     if (!code) return null;
-    return appData.portCathList.find(r => String(r.fileNumber || '').trim() === code) || null;
+    return portCathList.find(r => String(r.fileNumber || '').trim() === code) || null;
 }
 
 function registerPortCath(patient) {
@@ -5532,12 +5544,36 @@ function registerPortCath(patient) {
     }).catch(e => console.warn("Port Cath Register Error (Offline?)", e));
 
     // Optimistic local update so the icon flips immediately
-    appData.portCathList.push(record);
+    portCathList.push(record);
     if (appData.currentWard && appData.wards && appData.wards[appData.currentWard]) {
         if (typeof renderPatientsGrid === 'function') {
             renderPatientsGrid(appData.wards[appData.currentWard]);
         }
     }
+}
+
+// --- Port Cath Studio View (ported from jk) ---
+
+function openCathStudioView() {
+    document.querySelector('main').classList.add('hidden');
+    const analytics = document.getElementById('analytics-view');
+    if (analytics) analytics.classList.add('hidden');
+    const history = document.getElementById('history-view');
+    if (history) history.classList.add('hidden');
+    const notes = document.getElementById('notes-view');
+    if (notes) notes.classList.add('hidden');
+
+    document.getElementById('cath-studio-view').classList.remove('hidden');
+    document.getElementById('sidebar').classList.add('-translate-x-full');
+
+    if (typeof renderPortCathStudio === 'function') {
+        renderPortCathStudio();
+    }
+}
+
+function closeCathStudioView() {
+    document.getElementById('cath-studio-view').classList.add('hidden');
+    document.querySelector('main').classList.remove('hidden');
 }
 
 // Global Exports
@@ -5549,6 +5585,8 @@ window.closePEModal = closePEModal;
 window.submitPEForm = submitPEForm;
 window.registerPortCath = registerPortCath;
 window.getPortCathRecord = getPortCathRecord;
+window.openCathStudioView = openCathStudioView;
+window.closeCathStudioView = closeCathStudioView;
 
 
 
