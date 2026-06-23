@@ -1,4 +1,11 @@
 // portcath-studio.js — Port Cath Scheduling Studio
+//
+// Ported verbatim (byte-for-byte, zero edits) from apps/jk/portcath-studio.js
+// on 2026-06-23. This is a point-in-time snapshot, NOT a synced copy — if
+// jk/portcath-studio.js is later changed/fixed, this file will silently
+// drift out of sync with no automatic re-sync mechanism. p1's adaptation
+// layer lives in js/cath-studio-adapter.js, not in this file — edit that
+// file instead of this one wherever possible.
 
 // ── State (global, loaded/saved by app.js) ───────────────────────────────────
 let portCathSessionConfig = [];
