@@ -1,0 +1,41 @@
+/*
+  Port Cath Studio — theme adapter.
+  Maps the CSS variable names that css/cath-studio.css (ported verbatim from
+  jk/portcath-studio.css) expects, onto p1's own clinical teal/sky identity.
+  This file must be loaded BEFORE css/cath-studio.css and must never be edited
+  to match cath-studio.css's expectations — edit this file instead of the
+  verbatim ported one.
+
+  Note: --bg-card is intentionally NOT redefined here — p1's own :root block
+  in index.html already defines `--bg-card: var(--c2);` identically, so this
+  file would be a pointless duplicate for that one variable.
+*/
+:root {
+  --primary: var(--sky);
+  --primary-hover: #0a5549;
+  --primary-light: var(--sky-lt);
+
+  --danger: var(--red);
+  --danger-light: #fbe9e9;
+
+  --warning: var(--amber);
+  --warning-light: #fdf0e4;
+
+  --success: var(--emerald);
+  --success-light: #e7f5ec;
+
+  --bg-main: var(--c0);
+  --border: var(--bd1);
+  --text-main: var(--t1);
+  --text-muted: #6b6258;
+
+  --shadow: 0 1px 3px rgba(0,0,0,.08);
+  --shadow-md: 0 4px 12px rgba(0,0,0,.10);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,.14);
+
+  --transition: 0.2s ease;
+  --transition-fast: 0.12s ease;
+
+  --border-radius: 10px;
+  --border-radius-sm: 6px;
+}
