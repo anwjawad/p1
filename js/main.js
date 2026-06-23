@@ -43,6 +43,7 @@ var appData = {
     currentPatient: null,
     historyIndex: { ids: new Set(), codes: new Set() },
     hvcList: [],
+    portCathList: [],
     pharmacyMode: false // New Mode
 };
 
@@ -242,6 +243,7 @@ async function fetchData() {
 
         // Fetch HVC Status in parallel
         fetchHVCPatients();
+        fetchPortCathList();
 
     } catch (e) {
         console.error("Failed to load data", e);
@@ -5150,6 +5152,8 @@ function constructPatientQueryParams(p) {
 // Config - Destination URLs
 const HVC_API_URL = "https://script.google.com/macros/s/AKfycbzKCvkaQ8sDBoYCTWd9K4Rt9L4MPK3p1llGZwDT5nd5E33NeRen1l973EtFQyI42FvQ/exec";
 const PE_API_URL = "https://script.google.com/macros/s/AKfycbwjwZcOtRy0SmgBZABxPVDE30NHD2y_Tfu8py5P_VmETiPZz07QHleM7vTQYWyaZQB2/exec";
+const PORTCATH_API_URL = "https://script.google.com/macros/s/AKfycbyxuzwed0kHqZ3jPJKWKemX0huzKOFvm-1nooaTlo3NwEePG-ElI_9xkADLjTk-R6bK/exec";
+const PORTCATH_API_KEY = "medsched-2026-key-abc123";
 
 function fetchHVCPatients() {
     console.log("Fetching HVC Patient List...");
@@ -5464,6 +5468,78 @@ async function submitPEForm() {
     }
 }
 
+// --- Port Cath Integration (jk app) ---
+
+function fetchPortCathList() {
+    console.log("Fetching Port Cath List...");
+    const url = PORTCATH_API_URL + "?action=getAll&key=" + encodeURIComponent(PORTCATH_API_KEY);
+
+    fetch(url, {
+        method: 'GET',
+        mode: 'cors'
+    })
+        .then(res => res.json())
+        .then(data => {
+            if (data && data.status === 'ok' && Array.isArray(data.portcath)) {
+                appData.portCathList = data.portcath;
+                console.log("Port Cath List Loaded:", appData.portCathList.length);
+
+                if (appData.currentWard && appData.wards[appData.currentWard]) {
+                    if (typeof renderPatientsGrid === 'function') {
+                        renderPatientsGrid(appData.wards[appData.currentWard]);
+                    }
+                }
+            } else {
+                console.warn("Port Cath List Fetch Failed or Empty", data);
+            }
+        })
+        .catch(e => console.warn("Port Cath Fetch Error (Offline?)", e));
+}
+
+function getPortCathRecord(patient) {
+    if (!appData.portCathList || !patient) return null;
+    const code = String(patient.code || patient.id || '').trim();
+    if (!code) return null;
+    return appData.portCathList.find(r => String(r.fileNumber || '').trim() === code) || null;
+}
+
+function registerPortCath(patient) {
+    if (!patient) return;
+    if (getPortCathRecord(patient)) return; // already registered, do nothing
+
+    const record = {
+        id: Date.now().toString(),
+        name: patient.name || '',
+        fileNumber: String(patient.code || patient.id || ''),
+        date: '',
+        day: '',
+        weight: 0,
+        notes: 'for port cath insertion',
+        status: 'waiting',
+        phone: '00000'
+    };
+
+    fetch(PORTCATH_API_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            action: 'createRecord',
+            key: PORTCATH_API_KEY,
+            type: 'portcath',
+            record: record
+        })
+    }).catch(e => console.warn("Port Cath Register Error (Offline?)", e));
+
+    // Optimistic local update so the icon flips immediately
+    appData.portCathList.push(record);
+    if (appData.currentWard && appData.wards && appData.wards[appData.currentWard]) {
+        if (typeof renderPatientsGrid === 'function') {
+            renderPatientsGrid(appData.wards[appData.currentWard]);
+        }
+    }
+}
+
 // Global Exports
 window.openHVCModal = openHVCModal;
 window.closeHVCModal = closeHVCModal;
@@ -5471,6 +5547,8 @@ window.submitHVCForm = submitHVCForm;
 window.openPEModal = openPEModal;
 window.closePEModal = closePEModal;
 window.submitPEForm = submitPEForm;
+window.registerPortCath = registerPortCath;
+window.getPortCathRecord = getPortCathRecord;
 
 
 
