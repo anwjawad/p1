@@ -124,7 +124,12 @@ function openEditPatient(type, id) {
 
     document.getElementById('pcs-edit-name').value = patient.name || '';
     document.getElementById('pcs-edit-file').value = patient.fileNumber || '';
-    document.getElementById('pcs-edit-date').value = patient.date || '';
+    // The backend sometimes returns dates as full ISO datetimes
+    // (e.g. "2026-06-02T21:00:00.000Z") rather than plain "YYYY-MM-DD".
+    // <input type="date"> silently rejects anything but the plain form and
+    // would otherwise render blank here, risking the date being wiped out
+    // on save. Take just the date portion regardless of which form arrives.
+    document.getElementById('pcs-edit-date').value = (patient.date || '').slice(0, 10);
     document.getElementById('pcs-edit-weight').value = patient.weight != null ? patient.weight : '';
     document.getElementById('pcs-edit-notes').value = patient.notes || '';
     document.getElementById('pcs-edit-err').classList.remove('visible');
