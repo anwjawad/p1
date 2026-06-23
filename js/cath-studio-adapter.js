@@ -31,6 +31,15 @@ function showToast(message, type, duration) {
 // --- Real backend sync, reusing the same jk Apps Script endpoint p1 already
 //     talks to (PORTCATH_API_URL / PORTCATH_API_KEY, declared in js/main.js) ---
 function syncAfterChange(action, type, payload) {
+    // The shared backend treats 'portcath-history' as append-only and rejects
+    // update/delete for it server-side — but under mode:'no-cors' this client
+    // can never see that rejection (no readable response), so it would look
+    // like a silent, undetectable no-op. Guard client-side instead.
+    if (type === 'portcath-history' && action !== 'create') {
+        console.warn('Port Cath Studio: refusing to', action, 'an append-only portcath-history record', payload);
+        return;
+    }
+
     let body;
     if (action === 'create') {
         body = { action: 'createRecord', key: PORTCATH_API_KEY, type: type, record: payload };
