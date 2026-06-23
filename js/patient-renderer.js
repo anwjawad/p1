@@ -396,19 +396,13 @@ function renderPatientsGrid(patients) {
                         </button>` : '';
                     })()}
 
-                    <!-- Port Cath Button (status-colored; click only acts when unregistered) -->
+                    <!-- Add to Port Cath Waiting List Button (If not registered) -->
                     ${(() => {
                         const pcRecord = (typeof getPortCathRecord === 'function') ? getPortCathRecord(p) : null;
-                        let cls = 'bg-slate-100 text-slate-400 hover:bg-slate-300';
-                        let title = 'Add to Port Cath Waiting List';
-                        if (pcRecord) {
-                            const isScheduled = pcRecord.status === 'confirmed' && pcRecord.date;
-                            cls = isScheduled ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600';
-                            title = isScheduled ? `Port Cath scheduled: ${escHtml(pcRecord.date)}` : 'Port Cath: on Waiting List';
-                        }
-                        return `<button class="w-8 h-8 rounded-full ${cls} flex items-center justify-center transition-colors btn-portcath" title="${title}">
+                        return !pcRecord ?
+                            `<button class="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-colors btn-portcath" title="Add to Port Cath Waiting List">
                             <i class="fa-solid fa-syringe"></i>
-                        </button>`;
+                        </button>` : '';
                     })()}
 
                     ${p.labImages && p.labImages.length > 0 ? `
@@ -495,13 +489,8 @@ function renderPatientsGrid(patients) {
                     portCathBtn.onclick = (e) => {
                         e.stopPropagation();
                         const existing = (typeof getPortCathRecord === 'function') ? getPortCathRecord(p) : null;
-                        if (existing) {
-                            const isScheduled = existing.status === 'confirmed' && existing.date;
-                            alert(isScheduled
-                                ? `${p.name} has a Port Cath appointment on ${existing.date}.`
-                                : `${p.name} is on the Port Cath Waiting List.`);
-                            return;
-                        }
+                        if (existing) return; // button only renders when unregistered; safety no-op
+                        if (!confirm(`Add ${p.name} to the Port Cath Waiting List?`)) return;
                         if (typeof registerPortCath === 'function') {
                             registerPortCath(p);
                         }
