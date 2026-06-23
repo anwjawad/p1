@@ -9,6 +9,14 @@
   Note: --bg-card is intentionally NOT redefined here — p1's own :root block
   in index.html already defines `--bg-card: var(--c2);` identically, so this
   file would be a pointless duplicate for that one variable.
+
+  Known limitation: --primary-hover, --danger-light, --warning-light,
+  --success-light, --text-muted, and the --shadow* values below are flat
+  hex/rgba, not chained off p1's base tokens. They will NOT update when the
+  user switches p1's body.design-* theme (dark mode, etc.) — only --primary,
+  --danger, --warning, --success, --bg-main, --border, and --text-main do,
+  since those chain through var(--sky)/var(--red)/etc. If Cath Studio ever
+  looks wrong under a non-default theme, this is why.
 */
 :root {
   --primary: var(--sky);
