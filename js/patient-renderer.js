@@ -404,7 +404,7 @@ function renderPatientsGrid(patients) {
                         if (pcRecord) {
                             const isScheduled = pcRecord.status === 'confirmed' && pcRecord.date;
                             cls = isScheduled ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600';
-                            title = isScheduled ? `Port Cath scheduled: ${pcRecord.date}` : 'Port Cath: on Waiting List';
+                            title = isScheduled ? `Port Cath scheduled: ${escHtml(pcRecord.date)}` : 'Port Cath: on Waiting List';
                         }
                         return `<button class="w-8 h-8 rounded-full ${cls} flex items-center justify-center transition-colors btn-portcath" title="${title}">
                             <i class="fa-solid fa-syringe"></i>
