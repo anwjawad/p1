@@ -643,6 +643,9 @@
                     <button onclick="openNotesView()" class="sb-btn" style="font-size:.72rem;">
                         <i class="fa-solid fa-note-sticky" aria-hidden="true"></i> Notes
                     </button>
+                    <button onclick="openCathStudioView()" class="sb-btn" style="font-size:.72rem;">
+                        <i class="fa-solid fa-syringe" aria-hidden="true"></i> Port Cath List
+                    </button>
                 </div>
                 <button onclick="openAIHub()" class="sb-btn sb-btn-ai" aria-label="Open AI assistant">
                     <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> AI Assistant
@@ -1243,7 +1246,14 @@
         </div>
     </div>
 
-    </div>
+        <div id="cath-studio-view" class="hidden flex-1 overflow-y-auto" style="background:var(--bg-main);">
+            <div class="p-4 md:p-6">
+                <button onclick="closeCathStudioView()" class="mb-3 text-sm font-medium text-slate-500 hover:text-slate-800 flex items-center gap-1">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Patients
+                </button>
+                <section id="tab-portcath"></section>
+            </div>
+        </div>
     </div>
 
     <!-- Opioid Calculator Modal -->
@@ -2154,6 +2164,180 @@
     </div>
 
 
+<!-- ============================================================ -->
+<!-- Port Cath Studio — ported modals (from jk, unmodified IDs)   -->
+<!-- ============================================================ -->
+
+<!-- Port Cath Studio: Session Config Modal -->
+<div class="pcs-modal-overlay" id="pcs-config-overlay" style="align-items:center;justify-content:center;" role="dialog" aria-modal="true" aria-label="Configure session days">
+  <div class="pcs-root" style="background:transparent;padding:20px;width:100%;max-width:820px;">
+    <div id="pcs-config-inner">
+      <!-- rendered by pcsRenderConfigCalendar() -->
+    </div>
+  </div>
+</div>
+
+<!-- Port Cath Studio: Move Modal -->
+<div class="pcs-modal-overlay" id="pcs-move-overlay" role="dialog" aria-modal="true" aria-labelledby="pcs-move-title">
+  <div class="pcs-modal">
+    <h3 id="pcs-move-title">Move Patient</h3>
+    <div class="pcs-modal-sub" id="pcs-move-patient-info"></div>
+    <div class="pcs-modal-field">
+      <label>Move to date</label>
+      <select id="pcs-move-date-select">
+        <option value="">Select session day</option>
+      </select>
+    </div>
+    <div class="pcs-modal-field">
+      <label>Reason <span style="color:var(--danger)">*</span></label>
+      <input type="text" id="pcs-move-reason" placeholder="Enter reason for moving..." autocomplete="off"/>
+      <div class="pcs-error-msg" id="pcs-move-reason-err">Reason is required (at least 3 characters)</div>
+    </div>
+    <div class="pcs-modal-actions">
+      <button class="pcs-btn" onclick="pcsCloseMoveModal()">Cancel</button>
+      <button class="pcs-btn pcs-btn-primary" onclick="pcsConfirmMove()">Confirm Move</button>
+    </div>
+  </div>
+</div>
+
+<!-- Port Cath Studio: Action Modal (cancel/noshow/apologize/restore) -->
+<div class="pcs-modal-overlay" id="pcs-action-overlay" role="dialog" aria-modal="true" aria-labelledby="pcs-action-title">
+  <div class="pcs-modal">
+    <h3 id="pcs-action-title">Confirm Action</h3>
+    <div class="pcs-modal-sub" id="pcs-action-patient-info"></div>
+    <div class="pcs-modal-field">
+      <label>Reason <span style="color:var(--danger)">*</span></label>
+      <textarea id="pcs-action-reason" rows="2" placeholder="Enter reason..."></textarea>
+      <div class="pcs-error-msg" id="pcs-action-reason-err">Reason is required (at least 3 characters)</div>
+    </div>
+    <div class="pcs-modal-actions">
+      <button class="pcs-btn" onclick="pcsCloseActionModal()">Cancel</button>
+      <button class="pcs-btn pcs-btn-primary" id="pcs-action-confirm-btn" onclick="pcsConfirmAction()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Port Cath Studio: Waiting List — Add/Edit Modal -->
+<div class="pcs-modal-overlay" id="pcs-waiting-add-overlay" role="dialog" aria-modal="true" aria-labelledby="pcs-waiting-add-title">
+  <div class="pcs-modal">
+    <h3 id="pcs-waiting-add-title">Add to Waiting List</h3>
+    <div class="pcs-modal-field">
+      <label>Patient Name <span style="color:var(--danger)">*</span></label>
+      <input type="text" id="pcs-waiting-name" autocomplete="off"/>
+    </div>
+    <div class="pcs-modal-field">
+      <label>File Number <span style="color:var(--danger)">*</span></label>
+      <input type="text" id="pcs-waiting-file" autocomplete="off"/>
+    </div>
+    <div class="pcs-modal-field">
+      <label>Weight (kg) <span style="color:var(--danger)">*</span></label>
+      <input type="number" step="0.1" id="pcs-waiting-weight" autocomplete="off"/>
+    </div>
+    <div class="pcs-modal-field">
+      <label>Phone Number</label>
+      <input type="tel" id="pcs-waiting-phone" autocomplete="off"/>
+    </div>
+    <div class="pcs-modal-field">
+      <label>Notes</label>
+      <textarea id="pcs-waiting-notes" rows="2"></textarea>
+    </div>
+    <div class="pcs-error-msg" id="pcs-waiting-add-err">Please fill in Name, File Number, and Weight.</div>
+    <div class="pcs-modal-actions">
+      <button class="pcs-btn" onclick="pcsCloseWaitingAddModal()">Cancel</button>
+      <button class="pcs-btn pcs-btn-primary" onclick="pcsConfirmWaitingAdd()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Port Cath Studio: Waiting List — Assign Date Modal -->
+<div class="pcs-modal-overlay" id="pcs-waiting-assign-overlay" role="dialog" aria-modal="true" aria-labelledby="pcs-waiting-assign-title">
+  <div class="pcs-modal">
+    <h3 id="pcs-waiting-assign-title">Assign Date</h3>
+    <div class="pcs-modal-sub" id="pcs-waiting-assign-info"></div>
+    <div class="pcs-modal-field">
+      <label>Procedure Date <span style="color:var(--danger)">*</span></label>
+      <input type="date" id="pcs-waiting-assign-date"/>
+    </div>
+    <div class="pcs-error-msg" id="pcs-waiting-assign-err">Please select a date.</div>
+    <div class="pcs-modal-actions">
+      <button class="pcs-btn" onclick="pcsCloseAssignDateModal()">Cancel</button>
+      <button class="pcs-btn pcs-btn-primary" onclick="pcsConfirmAssignDate()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Port Cath Studio — NEW modals (p1-specific, not from jk)     -->
+<!-- ============================================================ -->
+
+<!-- Port Cath Studio: Add Patient Modal (p1-specific, simplified) -->
+<div class="pcs-modal-overlay" id="pcs-add-overlay" role="dialog" aria-modal="true" aria-labelledby="pcs-add-title">
+  <div class="pcs-modal">
+    <h3 id="pcs-add-title">Add Port Cath Patient</h3>
+    <div class="pcs-modal-field">
+      <label>Patient Name <span style="color:var(--danger)">*</span></label>
+      <input type="text" id="pcs-add-name" autocomplete="off"/>
+    </div>
+    <div class="pcs-modal-field">
+      <label>File Number <span style="color:var(--danger)">*</span></label>
+      <input type="text" id="pcs-add-file" autocomplete="off"/>
+    </div>
+    <div class="pcs-modal-field">
+      <label>Procedure Date <span style="color:var(--danger)">*</span></label>
+      <input type="date" id="pcs-add-date"/>
+    </div>
+    <div class="pcs-modal-field">
+      <label>Weight (kg) <span style="color:var(--danger)">*</span></label>
+      <input type="number" step="0.1" id="pcs-add-weight" autocomplete="off"/>
+    </div>
+    <div class="pcs-modal-field">
+      <label>Notes</label>
+      <textarea id="pcs-add-notes" rows="2"></textarea>
+    </div>
+    <div class="pcs-modal-field">
+      <label>Phone Number</label>
+      <input type="tel" id="pcs-add-phone" autocomplete="off"/>
+    </div>
+    <div class="pcs-error-msg" id="pcs-add-err">Please fill in Name, File Number, Date, and Weight.</div>
+    <div class="pcs-modal-actions">
+      <button class="pcs-btn" onclick="pcsCloseAddModal()">Cancel</button>
+      <button class="pcs-btn pcs-btn-primary" onclick="pcsConfirmAdd()">Add to Schedule</button>
+    </div>
+  </div>
+</div>
+
+<!-- Port Cath Studio: Edit Patient Modal (p1-specific, simplified) -->
+<div class="pcs-modal-overlay" id="pcs-edit-overlay" role="dialog" aria-modal="true" aria-labelledby="pcs-edit-title">
+  <div class="pcs-modal">
+    <h3 id="pcs-edit-title">Edit Port Cath Patient</h3>
+    <div class="pcs-modal-field">
+      <label>Patient Name <span style="color:var(--danger)">*</span></label>
+      <input type="text" id="pcs-edit-name" autocomplete="off"/>
+    </div>
+    <div class="pcs-modal-field">
+      <label>File Number <span style="color:var(--danger)">*</span></label>
+      <input type="text" id="pcs-edit-file" autocomplete="off"/>
+    </div>
+    <div class="pcs-modal-field">
+      <label>Procedure Date <span style="color:var(--danger)">*</span></label>
+      <input type="date" id="pcs-edit-date"/>
+    </div>
+    <div class="pcs-modal-field">
+      <label>Weight (kg) <span style="color:var(--danger)">*</span></label>
+      <input type="number" step="0.1" id="pcs-edit-weight" autocomplete="off"/>
+    </div>
+    <div class="pcs-modal-field">
+      <label>Notes</label>
+      <textarea id="pcs-edit-notes" rows="2"></textarea>
+    </div>
+    <div class="pcs-error-msg" id="pcs-edit-err">Please fill in Name, File Number, Date, and Weight.</div>
+    <div class="pcs-modal-actions">
+      <button class="pcs-btn" onclick="pcsCloseEditModal()">Cancel</button>
+      <button class="pcs-btn pcs-btn-primary" onclick="pcsConfirmEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
     <!-- ========================================== -->
     <!-- NEW: Home Visit Modal (HVC) -->
     <!-- ========================================== -->
@@ -2612,6 +2796,8 @@
 
     <!-- Scripts -->
     <script src="js/notes.js"></script>
+    <script src="js/cath-studio-adapter.js"></script>
+    <script src="js/cath-studio.js"></script>
 </body>
 
 </html>
