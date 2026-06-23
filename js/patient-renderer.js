@@ -365,6 +365,20 @@ function renderPatientsGrid(patients) {
                             <i class="fa-solid fa-house-medical mr-1"></i> HVC
                          </span>` : '';
                 })()}
+
+                    <!-- Port Cath Status Indicator (Left Side) -->
+                    ${(() => {
+                        const pcRecord = (typeof getPortCathRecord === 'function') ? getPortCathRecord(p) : null;
+                        if (!pcRecord) return '';
+                        const isScheduled = pcRecord.status === 'confirmed' && pcRecord.date;
+                        const label = isScheduled ? `Port Cath: ${escHtml(pcRecord.date)}` : 'Port Cath: Waiting List';
+                        const cls = isScheduled
+                            ? 'bg-green-100 text-green-700 border-green-200'
+                            : 'bg-amber-100 text-amber-700 border-amber-200';
+                        return `<span class="${cls} text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center border" title="${label}">
+                            <i class="fa-solid fa-syringe mr-1"></i> ${isScheduled ? escHtml(pcRecord.date) : 'Waiting'}
+                         </span>`;
+                    })()}
                 </div>
                 
                 ${!appData.selectionMode ? `
@@ -381,7 +395,22 @@ function renderPatientsGrid(patients) {
                             <i class="fa-solid fa-house-medical"></i>
                         </button>` : '';
                     })()}
-                
+
+                    <!-- Port Cath Button (status-colored; click only acts when unregistered) -->
+                    ${(() => {
+                        const pcRecord = (typeof getPortCathRecord === 'function') ? getPortCathRecord(p) : null;
+                        let cls = 'bg-slate-100 text-slate-400 hover:bg-slate-300';
+                        let title = 'Add to Port Cath Waiting List';
+                        if (pcRecord) {
+                            const isScheduled = pcRecord.status === 'confirmed' && pcRecord.date;
+                            cls = isScheduled ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600';
+                            title = isScheduled ? `Port Cath scheduled: ${pcRecord.date}` : 'Port Cath: on Waiting List';
+                        }
+                        return `<button class="w-8 h-8 rounded-full ${cls} flex items-center justify-center transition-colors btn-portcath" title="${title}">
+                            <i class="fa-solid fa-syringe"></i>
+                        </button>`;
+                    })()}
+
                     ${p.labImages && p.labImages.length > 0 ? `
                     <button class="w-8 h-8 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white flex items-center justify-center transition-colors btn-view-labs" title="View Labs">
                         <i class="fa-solid fa-flask"></i>
@@ -457,6 +486,24 @@ function renderPatientsGrid(patients) {
                             appData.currentPatient = p;
                             appData.pristinePatient = JSON.parse(JSON.stringify(p));
                             openHVCModal();
+                        }
+                    };
+                }
+                // Attach event listener for Port Cath
+                const portCathBtn = card.querySelector('.btn-portcath');
+                if (portCathBtn) {
+                    portCathBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        const existing = (typeof getPortCathRecord === 'function') ? getPortCathRecord(p) : null;
+                        if (existing) {
+                            const isScheduled = existing.status === 'confirmed' && existing.date;
+                            alert(isScheduled
+                                ? `${p.name} has a Port Cath appointment on ${existing.date}.`
+                                : `${p.name} is on the Port Cath Waiting List.`);
+                            return;
+                        }
+                        if (typeof registerPortCath === 'function') {
+                            registerPortCath(p);
                         }
                     };
                 }
