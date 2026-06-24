@@ -5473,6 +5473,21 @@ async function submitPEForm() {
 
 // --- Port Cath Integration (jk app) ---
 
+// The backend's PortCath sheet stores some "date" columns as actual Sheets
+// Date cells rather than plain text, so getAll sometimes returns full ISO
+// datetimes (e.g. "2026-06-02T21:00:00.000Z") instead of "YYYY-MM-DD". The
+// ported Port Cath Studio code (js/cath-studio.js) does exact string
+// equality (p.date === dateStr) throughout — calendar cell counts, day
+// cards, etc. — so any record with an ISO-datetime date silently fails
+// every one of those lookups while still passing the looser .startsWith()
+// checks used for month totals. Normalize once, here, right after fetch,
+// rather than patching every consumer.
+function pcsNormalizeDateField(record, field) {
+    if (record && typeof record[field] === 'string' && record[field].length > 10) {
+        record[field] = record[field].slice(0, 10);
+    }
+}
+
 function fetchPortCathList() {
     console.log("Fetching Port Cath List...");
     const url = PORTCATH_API_URL + "?action=getAll&key=" + encodeURIComponent(PORTCATH_API_KEY);
@@ -5485,11 +5500,17 @@ function fetchPortCathList() {
         .then(data => {
             if (data && data.status === 'ok' && Array.isArray(data.portcath)) {
                 portCathList = data.portcath;
+                portCathList.forEach(p => pcsNormalizeDateField(p, 'date'));
                 if (Array.isArray(data.portcathSessionConfig)) {
                     portCathSessionConfig = data.portcathSessionConfig;
+                    portCathSessionConfig.forEach(c => pcsNormalizeDateField(c, 'date'));
                 }
                 if (Array.isArray(data.portcathHistory)) {
                     portCathActionHistory = data.portcathHistory;
+                    portCathActionHistory.forEach(h => {
+                        pcsNormalizeDateField(h, 'fromDate');
+                        pcsNormalizeDateField(h, 'toDate');
+                    });
                 }
                 console.log("Port Cath List Loaded:", portCathList.length);
 
