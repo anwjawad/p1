@@ -228,12 +228,10 @@ async function syncNotesToBackend() {
                     try {
                         let url = null;
                         if (typeof uploadFileToBackend === 'function') {
-                            // Existing function returns JSON or URL? 
-                            // Looking at main.js, uploadFileToBackend returns a PROMISE that returns json.url? 
-                            // Wait, main.js uploadFileToBackend void? No, let's double check.
-                            // Actually, looking at main.js line 4938: const dataUrl = await uploadFileToBackend(file);
-                            // It seems it returns the URL.
-                            url = await uploadFileToBackend(file);
+                            // uploadFileToBackend (main.js) resolves with the full
+                            // backend response { status, url, fileId, name } - unwrap .url.
+                            const uploadResult = await uploadFileToBackend(file);
+                            url = uploadResult && uploadResult.url;
                         } else {
                             console.warn("Upload function missing");
                         }

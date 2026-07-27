@@ -4587,57 +4587,62 @@ async function handleImagePaste(e) {
 
 
 
-function uploadImage(file) {
+async function uploadImage(file) {
     const status = document.getElementById('upload-status');
     if (status) status.classList.remove('hidden');
 
-    uploadFileToBackend(file);
+    try {
+        const result = await uploadFileToBackend(file);
+        if (!appData.currentPatient.labImages) appData.currentPatient.labImages = [];
+        appData.currentPatient.labImages.push({
+            url: result.url,
+            id: result.fileId, // Use ID for reliable thumbnail
+            name: result.name
+        });
+
+        triggerSave();
+        renderLabImages();
+    } catch (e) {
+        console.error(e);
+        alert("Upload Error. Please check your internet or Script deployment.");
+    } finally {
+        if (status) status.classList.add('hidden');
+    }
 }
 
-async function uploadFileToBackend(file) {
-    const status = document.getElementById('upload-status');
-    if (status) status.classList.remove('hidden');
-
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = async () => {
-        const base64 = reader.result;
-
-        try {
-            // Use standard fetch (awaiting CORS headers from GAS)
-            const res = await fetch(GAS_API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // text/plain avoids OPTIONS postflight
-                body: JSON.stringify({
-                    action: 'upload_image',
-                    image: base64, // Full data URI
-                    filename: 'paste_' + Date.now() + '.png'
-                })
-            });
-
-            const json = await res.json();
-
-            if (json.status === 'success') {
-                if (!appData.currentPatient.labImages) appData.currentPatient.labImages = [];
-                appData.currentPatient.labImages.push({
-                    url: json.url,
-                    id: json.fileId, // Use ID for reliable thumbnail
-                    name: json.name
+// Uploads the file to the backend (Google Drive via Apps Script) and
+// resolves with { status, url, fileId, name }. The stored `url` is a short
+// Drive link, not the raw Base64 image, so patient-save payloads stay small.
+function uploadFileToBackend(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = async () => {
+            try {
+                const base64 = reader.result;
+                const res = await fetch(GAS_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // text/plain avoids OPTIONS preflight
+                    body: JSON.stringify({
+                        action: 'upload_image',
+                        image: base64, // Full data URI
+                        filename: 'paste_' + Date.now() + '.png'
+                    })
                 });
 
-                triggerSave();
-                renderLabImages();
-            } else {
-                alert("Upload failed: " + (json.error || json.message));
-            }
+                const json = await res.json();
 
-        } catch (e) {
-            console.error(e);
-            alert("Upload Error. Please check your internet or Script deployment.");
-        } finally {
-            if (status) status.classList.add('hidden');
-        }
-    };
+                if (json.status === 'success') {
+                    resolve(json);
+                } else {
+                    reject(new Error(json.error || json.message || 'Upload failed'));
+                }
+            } catch (e) {
+                reject(e);
+            }
+        };
+        reader.onerror = (e) => reject(e);
+        reader.readAsDataURL(file);
+    });
 }
 
 
@@ -5031,18 +5036,6 @@ function toggleCalc() {
 
 
 // ----------------------------------------------------------------------
-// HELPER: Simulate Backend Upload (Convert to DataURL for Local Usage)
-// ----------------------------------------------------------------------
-function uploadFileToBackend(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target.result); // Resolve with Data URL
-        reader.onerror = (e) => reject(e);
-        reader.readAsDataURL(file);
-    });
-}
-
-// ----------------------------------------------------------------------
 // LABS IMAGE HANDLER (Fixed)
 // ----------------------------------------------------------------------
 async function handleLabsImageUpload(file) {
@@ -5061,16 +5054,16 @@ async function handleLabsImageUpload(file) {
                 </div>`;
         }
 
-        // 2. "Upload" (Convert to Base64)
-        const dataUrl = await uploadFileToBackend(file);
+        // 2. Upload to Drive via backend (returns a small URL, not raw Base64)
+        const result = await uploadFileToBackend(file);
 
         // 3. Store in AppData
         if (!appData.currentPatient.labImages) appData.currentPatient.labImages = [];
 
         // Add new image with timestamp
         appData.currentPatient.labImages.push({
-            id: Date.now().toString(),
-            url: dataUrl,
+            id: result.fileId || Date.now().toString(),
+            url: result.url,
             date: new Date().toISOString()
         });
 
