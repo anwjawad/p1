@@ -4905,8 +4905,13 @@ function renderLabsRecentImages() {
     images.slice().reverse().forEach(img => {
         const div = document.createElement('div');
         div.className = "aspect-square rounded-lg border border-slate-200 bg-slate-100 overflow-hidden relative cursor-pointer group";
-        div.innerHTML = "<img src='" + img.url + "' class='w-full h-full object-cover'><div class='absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center'><i class='fa-solid fa-eye text-white opacity-0 group-hover:opacity-100 drop-shadow-md'></i></div>";
-        div.onclick = () => openImageLightbox(img.url);
+        // Use the 'thumbnail' endpoint (like renderLabImages) - Drive's uc?export=view
+        // link is unreliable for direct <img> embedding. Fall back to img.url for
+        // legacy entries that don't have a Drive file id.
+        const thumbUrl = img.id ? `https://drive.google.com/thumbnail?id=${img.id}&sz=w800` : img.url;
+        const fullUrl = img.id ? `https://drive.google.com/thumbnail?id=${img.id}&sz=w3000` : img.url;
+        div.innerHTML = "<img src='" + thumbUrl + "' class='w-full h-full object-cover' onerror=\"this.src='https://placehold.co/600x400?text=Scan+QR+to+View'; this.onerror=null;\"><div class='absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center'><i class='fa-solid fa-eye text-white opacity-0 group-hover:opacity-100 drop-shadow-md'></i></div>";
+        div.onclick = () => openImageLightbox(fullUrl);
         list.appendChild(div);
     });
 }
